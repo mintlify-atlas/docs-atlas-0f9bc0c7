@@ -1,0 +1,554 @@
+---
+title: CRUD Operations Guide
+description: Complete guide to implementing Create, Read, Update, and Delete operations in MINI PHP
+---
+
+This guide walks through implementing full CRUD (Create, Read, Update, Delete) functionality using the Songs feature as a real-world example.
+
+## Architecture Overview
+
+MINI's CRUD operations follow the MVC pattern:
+
+- **Model** (`application/model/model.php`) - Database queries
+- **Controller** (`application/controller/songs.php`) - Business logic and flow control
+- **View** (`application/view/songs/`) - HTML presentation
+
+## Read Operations
+
+### Get All Records
+
+<Tabs>
+  <Tab title="Model">
+    ```php application/model/model.php
+    public function getAllSongs()
+    {
+        $sql = "SELECT id, artist, track, link FROM song";
+        $query = $this->db->prepare($sql);
+        $query->execute();
+        
+        return $query->fetchAll();
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Controller">
+    ```php application/controller/songs.php
+    public function index()
+    {
+        // Get all songs from model
+        $songs = $this->model->getAllSongs();
+        $amount_of_songs = $this->model->getAmountOfSongs();
+        
+        // Load views
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/songs/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    ```
+  </Tab>
+  
+  <Tab title="View">
+    ```php application/view/songs/index.php
+    <table>
+        <thead>
+            <tr>
+                <td>Id</td>
+                <td>Artist</td>
+                <td>Track</td>
+                <td>Link</td>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($songs as $song) { ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td>
+                        <a href="<?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>">
+                            <?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>
+                        </a>
+                    </td>
+                </tr>
+            <?php } ?>
+        </tbody>
+    </table>
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  The `getAllSongs()` method returns an array of objects. Each object's properties correspond to database columns.
+</Note>
+
+### Get Single Record
+
+<Tabs>
+  <Tab title="Model">
+    ```php application/model/model.php
+    public function getSong($song_id)
+    {
+        $sql = "SELECT id, artist, track, link FROM song WHERE id = :song_id LIMIT 1";
+        $query = $this->db->prepare($sql);
+        $parameters = array(':song_id' => $song_id);
+        
+        $query->execute($parameters);
+        
+        return $query->fetch();
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Controller">
+    ```php application/controller/songs.php
+    public function editSong($song_id)
+    {
+        if (isset($song_id)) {
+            // Get song from model
+            $song = $this->model->getSong($song_id);
+            
+            // Load views
+            require APP . 'view/_templates/header.php';
+            require APP . 'view/songs/edit.php';
+            require APP . 'view/_templates/footer.php';
+        } else {
+            // No ID provided - redirect
+            header('location: ' . URL . 'songs/index');
+        }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="View">
+    ```php application/view/songs/edit.php
+    <form action="<?php echo URL; ?>songs/updatesong" method="POST">
+        <label>Artist</label>
+        <input type="text" name="artist" 
+               value="<?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?>" />
+        
+        <label>Track</label>
+        <input type="text" name="track" 
+               value="<?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?>" />
+        
+        <input type="hidden" name="song_id" 
+               value="<?php echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>" />
+        
+        <input type="submit" name="submit_update_song" value="Update" />
+    </form>
+    ```
+  </Tab>
+</Tabs>
+
+## Create Operations
+
+### Add New Record
+
+<Steps>
+  <Step title="Create the form view">
+    ```php application/view/songs/index.php
+    <form action="<?php echo URL; ?>songs/addsong" method="POST">
+        <label>Artist</label>
+        <input type="text" name="artist" value="" required />
+        
+        <label>Track</label>
+        <input type="text" name="track" value="" required />
+        
+        <label>Link</label>
+        <input type="text" name="link" value="" />
+        
+        <input type="submit" name="submit_add_song" value="Submit" />
+    </form>
+    ```
+  </Step>
+  
+  <Step title="Handle form submission in controller">
+    ```php application/controller/songs.php
+    public function addSong()
+    {
+        // Check if form was submitted
+        if (isset($_POST["submit_add_song"])) {
+            // Call model method
+            $this->model->addSong(
+                $_POST["artist"],
+                $_POST["track"],
+                $_POST["link"]
+            );
+        }
+        
+        // Redirect back to index
+        header('location: ' . URL . 'songs/index');
+    }
+    ```
+  </Step>
+  
+  <Step title="Execute INSERT query in model">
+    ```php application/model/model.php
+    public function addSong($artist, $track, $link)
+    {
+        $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+        $query = $this->db->prepare($sql);
+        $parameters = array(
+            ':artist' => $artist,
+            ':track' => $track,
+            ':link' => $link
+        );
+        
+        $query->execute($parameters);
+    }
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  The controller action (e.g., `addSong()`) is **not a regular page** - it's an ACTION endpoint. It processes POST data and redirects. Never render views directly from action methods.
+</Warning>
+
+## Update Operations
+
+### Modify Existing Record
+
+<Steps>
+  <Step title="Create edit form with pre-filled data">
+    ```php application/view/songs/edit.php
+    <form action="<?php echo URL; ?>songs/updatesong" method="POST">
+        <label>Artist</label>
+        <input type="text" name="artist" 
+               value="<?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?>" 
+               required />
+        
+        <label>Track</label>
+        <input type="text" name="track" 
+               value="<?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?>" 
+               required />
+        
+        <label>Link</label>
+        <input type="text" name="link" 
+               value="<?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>" />
+        
+        <!-- Hidden field to track which record to update -->
+        <input type="hidden" name="song_id" 
+               value="<?php echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>" />
+        
+        <input type="submit" name="submit_update_song" value="Update" />
+    </form>
+    ```
+  </Step>
+  
+  <Step title="Handle update in controller">
+    ```php application/controller/songs.php
+    public function updateSong()
+    {
+        if (isset($_POST["submit_update_song"])) {
+            // Call model update method
+            $this->model->updateSong(
+                $_POST["artist"],
+                $_POST["track"],
+                $_POST["link"],
+                $_POST['song_id']
+            );
+        }
+        
+        // Redirect back to index
+        header('location: ' . URL . 'songs/index');
+    }
+    ```
+  </Step>
+  
+  <Step title="Execute UPDATE query in model">
+    ```php application/model/model.php
+    public function updateSong($artist, $track, $link, $song_id)
+    {
+        $sql = "UPDATE song SET artist = :artist, track = :track, link = :link WHERE id = :song_id";
+        $query = $this->db->prepare($sql);
+        $parameters = array(
+            ':artist' => $artist,
+            ':track' => $track,
+            ':link' => $link,
+            ':song_id' => $song_id
+        );
+        
+        $query->execute($parameters);
+    }
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The hidden `song_id` field is crucial - it tells the update method which record to modify.
+</Note>
+
+## Delete Operations
+
+### Remove Record
+
+<Tabs>
+  <Tab title="View Link">
+    ```php application/view/songs/index.php
+    <?php foreach ($songs as $song) { ?>
+        <tr>
+            <td><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+            <td>
+                <a href="<?php echo URL . 'songs/deletesong/' . htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>">
+                    delete
+                </a>
+            </td>
+        </tr>
+    <?php } ?>
+    ```
+  </Tab>
+  
+  <Tab title="Controller">
+    ```php application/controller/songs.php
+    public function deleteSong($song_id)
+    {
+        if (isset($song_id)) {
+            // Call model delete method
+            $this->model->deleteSong($song_id);
+        }
+        
+        // Redirect back to index
+        header('location: ' . URL . 'songs/index');
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Model">
+    ```php application/model/model.php
+    public function deleteSong($song_id)
+    {
+        $sql = "DELETE FROM song WHERE id = :song_id";
+        $query = $this->db->prepare($sql);
+        $parameters = array(':song_id' => $song_id);
+        
+        $query->execute($parameters);
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Delete operations via GET requests (URL links) are **not production-ready**. In real applications, use POST requests with CSRF tokens and confirmation dialogs.
+</Warning>
+
+## Form Handling
+
+### POST vs GET
+
+**POST requests** (forms with `method="POST"`):
+- Used for Create and Update operations
+- Data in `$_POST` array
+- Not visible in URL
+- Can handle large amounts of data
+
+```php
+if (isset($_POST["submit_add_song"])) {
+    $artist = $_POST["artist"];
+    $track = $_POST["track"];
+}
+```
+
+**GET requests** (URL parameters):
+- Used for Read and Delete operations
+- Data in URL and method parameters
+- Bookmarkable URLs
+- Limited data size
+
+```php
+public function deleteSong($song_id)
+{
+    // $song_id comes from URL: /songs/deletesong/123
+}
+```
+
+### Form Validation
+
+MINI uses HTML5 validation:
+
+```php
+<input type="text" name="artist" required />
+<input type="email" name="email" required />
+<input type="url" name="website" />
+```
+
+<Accordion title="Server-side validation (recommended for production)">
+  ```php application/controller/songs.php
+  public function addSong()
+  {
+      if (isset($_POST["submit_add_song"])) {
+          // Validate input
+          $artist = trim($_POST["artist"]);
+          $track = trim($_POST["track"]);
+          
+          if (empty($artist) || empty($track)) {
+              // Handle validation error
+              $_SESSION['error'] = 'Artist and Track are required';
+              header('location: ' . URL . 'songs/index');
+              return;
+          }
+          
+          // Validation passed
+          $this->model->addSong($artist, $track, $_POST["link"]);
+      }
+      
+      header('location: ' . URL . 'songs/index');
+  }
+  ```
+</Accordion>
+
+## Data Security
+
+### Input Security (Automatic)
+
+<Note>
+  PDO prepared statements **automatically escape all input**, preventing SQL injection. You don't need to manually sanitize data before database operations.
+</Note>
+
+```php
+// ✅ This is safe - PDO handles escaping
+$this->model->addSong($_POST["artist"], $_POST["track"], $_POST["link"]);
+```
+
+### Output Security (Required)
+
+Always escape output in views:
+
+```php
+// ✅ CORRECT - Prevents XSS attacks
+<?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?>
+
+// ❌ WRONG - Vulnerable to XSS
+<?php echo $song->artist; ?>
+```
+
+**Why `htmlspecialchars()`?**
+- Converts special characters to HTML entities
+- `ENT_QUOTES` - Escapes both single and double quotes
+- `UTF-8` - Proper character encoding
+
+## Common Patterns
+
+### Aggregate Queries
+
+```php application/model/model.php
+public function getAmountOfSongs()
+{
+    $sql = "SELECT COUNT(id) AS amount_of_songs FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    return $query->fetch()->amount_of_songs;
+}
+```
+
+### Conditional Queries
+
+```php
+public function searchSongs($search_term)
+{
+    $sql = "SELECT id, artist, track FROM song WHERE artist LIKE :search OR track LIKE :search";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':search' => '%' . $search_term . '%');
+    $query->execute($parameters);
+    
+    return $query->fetchAll();
+}
+```
+
+### Pagination
+
+```php
+public function getSongsPaginated($offset, $limit)
+{
+    $sql = "SELECT id, artist, track FROM song LIMIT :limit OFFSET :offset";
+    $query = $this->db->prepare($sql);
+    $query->bindValue(':limit', $limit, PDO::PARAM_INT);
+    $query->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $query->execute();
+    
+    return $query->fetchAll();
+}
+```
+
+<Note>
+  For LIMIT/OFFSET, use `bindValue()` with `PDO::PARAM_INT` instead of the parameters array.
+</Note>
+
+## URL Routing
+
+MINI's routing maps URLs to controller methods:
+
+```
+URL: /songs/index
+→ Controller: Songs
+→ Method: index()
+
+URL: /songs/editsong/5
+→ Controller: Songs
+→ Method: editSong($song_id)
+→ Parameter: $song_id = 5
+
+URL: /songs/deletesong/5
+→ Controller: Songs  
+→ Method: deleteSong($song_id)
+→ Parameter: $song_id = 5
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep database logic in the Model">
+    All SQL queries should be in `application/model/model.php`, not in controllers.
+    
+    ```php
+    // ✅ CORRECT
+    $songs = $this->model->getAllSongs();
+    
+    // ❌ WRONG
+    $query = $this->db->prepare("SELECT * FROM song");
+    ```
+  </Accordion>
+  
+  <Accordion title="Use POST for data modification">
+    - Create, Update, Delete should use POST requests
+    - Only Read operations should use GET
+    - Prevents accidental modifications from web crawlers
+  </Accordion>
+  
+  <Accordion title="Always redirect after POST">
+    Prevents duplicate submissions when users refresh the page.
+    
+    ```php
+    public function addSong()
+    {
+        if (isset($_POST["submit_add_song"])) {
+            $this->model->addSong(/* ... */);
+        }
+        
+        // Always redirect
+        header('location: ' . URL . 'songs/index');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Escape all output">
+    Use `htmlspecialchars()` on every piece of user-generated content displayed in views.
+  </Accordion>
+  
+  <Accordion title="Validate user input">
+    - Check for required fields
+    - Validate data types and formats
+    - Use HTML5 validation + server-side validation
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="AJAX Integration" icon="bolt" href="/guides/ajax">
+    Learn how to make CRUD operations dynamic with AJAX
+  </Card>
+  
+  <Card title="Database Guide" icon="database" href="/guides/database">
+    Deep dive into database configuration and PDO usage
+  </Card>
+</CardGroup>

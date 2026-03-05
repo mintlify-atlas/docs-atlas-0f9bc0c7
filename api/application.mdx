@@ -1,0 +1,259 @@
+---
+title: "Application Class"
+description: "Core application class that handles routing and request processing"
+---
+
+## Overview
+
+The `Application` class is the heart of the MINI framework. It handles URL routing, controller instantiation, and method execution based on the request URL.
+
+Located at: `application/core/application.php`
+
+## Class Definition
+
+```php application.php
+class Application
+{
+    /** @var null The controller */
+    private $url_controller = null;
+
+    /** @var null The method (of the above controller), often also named "action" */
+    private $url_action = null;
+
+    /** @var array URL parameters */
+    private $url_params = array();
+
+    public function __construct()
+    {
+        // create array with URL parts in $url
+        $this->splitUrl();
+        // ... routing logic
+    }
+}
+```
+
+## Properties
+
+<ParamField path="url_controller" type="string|null" required>
+  The controller name extracted from the URL. This maps to a file in `application/controller/`.
+</ParamField>
+
+<ParamField path="url_action" type="string|null" required>
+  The method name to call on the controller. Defaults to `index()` if not provided.
+</ParamField>
+
+<ParamField path="url_params" type="array" required>
+  Additional URL segments passed as parameters to the controller method.
+</ParamField>
+
+## Constructor
+
+### `__construct()`
+
+Initializes the application and processes the incoming request.
+
+**Process Flow:**
+
+<Steps>
+  <Step title="Parse URL">
+    Calls `splitUrl()` to extract controller, action, and parameters from the URL.
+  </Step>
+  
+  <Step title="Load Controller">
+    Checks if the controller file exists in `application/controller/`. If no controller is specified, loads the default `Home` controller.
+  </Step>
+  
+  <Step title="Instantiate Controller">
+    Creates an instance of the controller class.
+  </Step>
+  
+  <Step title="Execute Method">
+    Checks if the requested method exists and calls it with any URL parameters.
+  </Step>
+  
+  <Step title="Handle Errors">
+    Redirects to the error page (`problem` controller) if the controller or method doesn't exist.
+  </Step>
+</Steps>
+
+**Example:**
+
+```php
+// In public/index.php
+$app = new Application();
+
+// For URL: example.com/songs/editsong/17
+// 1. Loads application/controller/songs.php
+// 2. Instantiates Songs class
+// 3. Calls $songs->editsong(17)
+```
+
+## Private Methods
+
+### `splitUrl()`
+
+Parses the URL and extracts routing information.
+
+```php
+private function splitUrl()
+{
+    if (isset($_GET['url'])) {
+        // split URL
+        $url = trim($_GET['url'], '/');
+        $url = filter_var($url, FILTER_SANITIZE_URL);
+        $url = explode('/', $url);
+
+        // Put URL parts into according properties
+        $this->url_controller = isset($url[0]) ? $url[0] : null;
+        $this->url_action = isset($url[1]) ? $url[1] : null;
+
+        // Remove controller and action from the split URL
+        unset($url[0], $url[1]);
+
+        // Rebase array keys and store the URL params
+        $this->url_params = array_values($url);
+    }
+}
+```
+
+**URL Parsing Examples:**
+
+| URL | Controller | Action | Parameters |
+|-----|------------|--------|------------|
+| `/` | `null` → `home` | `null` → `index` | `[]` |
+| `/songs` | `songs` | `null` → `index` | `[]` |
+| `/songs/editsong/17` | `songs` | `editsong` | `['17']` |
+| `/user/profile/john/settings` | `user` | `profile` | `['john', 'settings']` |
+
+## Routing Logic
+
+The complete routing logic from the constructor:
+
+```php
+if (!$this->url_controller) {
+    // No controller: load home page
+    require APP . 'controller/home.php';
+    $page = new Home();
+    $page->index();
+
+} elseif (file_exists(APP . 'controller/' . $this->url_controller . '.php')) {
+    // Controller exists: load and instantiate
+    require APP . 'controller/' . $this->url_controller . '.php';
+    $this->url_controller = new $this->url_controller();
+
+    if (method_exists($this->url_controller, $this->url_action)) {
+        // Method exists: call it with parameters
+        if (!empty($this->url_params)) {
+            call_user_func_array(
+                array($this->url_controller, $this->url_action), 
+                $this->url_params
+            );
+        } else {
+            $this->url_controller->{$this->url_action}();
+        }
+    } else {
+        if (strlen($this->url_action) == 0) {
+            // No action: call default index() method
+            $this->url_controller->index();
+        } else {
+            // Method doesn't exist: error page
+            header('location: ' . URL . 'problem');
+        }
+    }
+} else {
+    // Controller doesn't exist: error page
+    header('location: ' . URL . 'problem');
+}
+```
+
+## Error Handling
+
+<Accordion title="Controller Not Found">
+  When a controller file doesn't exist, MINI redirects to `/problem`:
+  
+  ```php
+  header('location: ' . URL . 'problem');
+  ```
+  
+  This loads the `Problem` controller (formerly `Error` in PHP 5, renamed for PHP 7 compatibility).
+</Accordion>
+
+<Accordion title="Method Not Found">
+  When a controller exists but the method doesn't:
+  - If no action is specified, falls back to `index()`
+  - If an action is specified but doesn't exist, redirects to `/problem`
+</Accordion>
+
+## Usage Examples
+
+### Basic Routing
+
+```php
+// URL: example.com/home
+// Loads: application/controller/home.php
+// Calls: Home::index()
+
+public function index()
+{
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/home/index.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+### Routing with Parameters
+
+```php
+// URL: example.com/songs/editsong/17
+// Loads: application/controller/songs.php
+// Calls: Songs::editsong('17')
+
+public function editsong($song_id)
+{
+    $song = $this->model->getSong($song_id);
+    
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/songs/edit.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+### Multiple Parameters
+
+```php
+// URL: example.com/blog/post/2024/03/hello-world
+// Calls: Blog::post('2024', '03', 'hello-world')
+
+public function post($year, $month, $slug)
+{
+    $post = $this->model->getPostBySlug($year, $month, $slug);
+    // ... render view
+}
+```
+
+## Security Considerations
+
+<Warning>
+  The URL is sanitized using `filter_var($url, FILTER_SANITIZE_URL)` before processing. However, you should still validate parameters in your controller methods.
+</Warning>
+
+<Note>
+  All application logic outside the `/public` folder is protected by `.htaccess`, preventing direct access to controllers, models, and configuration files.
+</Note>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Controller Class" icon="code" href="/api/controller">
+    Learn about the base Controller class
+  </Card>
+  <Card title="Routing Concept" icon="route" href="/concepts/routing">
+    Deep dive into the routing system
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand the request lifecycle
+  </Card>
+  <Card title="Controllers Guide" icon="file-code" href="/concepts/controllers">
+    How to create controllers
+  </Card>
+</CardGroup>

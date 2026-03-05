@@ -1,0 +1,358 @@
+---
+title: Database Setup and Usage
+description: Learn how to configure and use the database in MINI PHP
+---
+
+MINI uses PDO (PHP Data Objects) for secure and efficient database operations. This guide covers everything you need to know about database setup and usage.
+
+## Database Configuration
+
+Database settings are defined in `application/config/config.php`:
+
+```php application/config/config.php
+define('DB_TYPE', 'mysql');
+define('DB_HOST', '127.0.0.1');
+define('DB_NAME', 'mini');
+define('DB_USER', 'root');
+define('DB_PASS', 'your_password');
+define('DB_CHARSET', 'utf8');
+```
+
+<Steps>
+  <Step title="Create the database">
+    Run the SQL files in the `_install/` directory in order:
+    
+    ```sql _install/01-create-database.sql
+    CREATE DATABASE IF NOT EXISTS `mini`;
+    ```
+  </Step>
+  
+  <Step title="Create tables">
+    ```sql _install/02-create-table-song.sql
+    CREATE TABLE `mini`.`song` (
+      `id` int(11) NOT NULL AUTO_INCREMENT,
+      `artist` text COLLATE utf8_unicode_ci NOT NULL,
+      `track` text COLLATE utf8_unicode_ci NOT NULL,
+      `link` text COLLATE utf8_unicode_ci,
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `id` (`id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+    ```
+  </Step>
+  
+  <Step title="Insert demo data (optional)">
+    ```sql _install/03-insert-demo-data-into-table-song.sql
+    INSERT INTO `mini`.`song` (`id`, `artist`, `track`, `link`) VALUES
+    (1, 'Dena', 'Cash, Diamond Ring, Swimming Pools', 'http://www.youtube.com/watch?v=r4CDc9yCAqE'),
+    (2, 'Jessy Lanza', 'Kathy Lee', 'http://vimeo.com/73455369');
+    ```
+  </Step>
+  
+  <Step title="Update configuration">
+    Update `application/config/config.php` with your database credentials.
+  </Step>
+</Steps>
+
+## PDO Connection
+
+The database connection is automatically established when a controller is instantiated.
+
+### Connection Setup
+
+```php application/core/controller.php
+private function openDatabaseConnection()
+{
+    // Set PDO options
+    $options = array(
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
+    );
+
+    // Create PDO connection
+    $this->db = new PDO(
+        DB_TYPE . ':host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
+        DB_USER,
+        DB_PASS,
+        $options
+    );
+}
+```
+
+### PDO Options Explained
+
+<Accordion title="PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ">
+  Results are returned as objects, allowing you to access data like `$result->user_name`.
+  
+  **Alternative fetch modes:**
+  - `PDO::FETCH_ASSOC` - Returns associative arrays: `$result["user_name"]`
+  - `PDO::FETCH_BOTH` - Returns both object and array (default)
+</Accordion>
+
+<Accordion title="PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING">
+  Errors trigger PHP warnings instead of silent failures.
+  
+  **Other error modes:**
+  - `PDO::ERRMODE_SILENT` - No errors shown (not recommended)
+  - `PDO::ERRMODE_EXCEPTION` - Throws exceptions (recommended for production)
+</Accordion>
+
+## Executing Queries
+
+MINI uses prepared statements for all database queries to prevent SQL injection.
+
+### Basic SELECT Query
+
+```php application/model/model.php
+public function getAllSongs()
+{
+    $sql = "SELECT id, artist, track, link FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    return $query->fetchAll();
+}
+```
+
+### Query with Parameters
+
+```php application/model/model.php
+public function getSong($song_id)
+{
+    $sql = "SELECT id, artist, track, link FROM song WHERE id = :song_id LIMIT 1";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+    
+    $query->execute($parameters);
+    
+    return $query->fetch();
+}
+```
+
+<Note>
+  **Named parameters** (`:parameter_name`) are used instead of question marks for better readability and maintainability.
+</Note>
+
+### INSERT Query
+
+```php application/model/model.php
+public function addSong($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $parameters = array(
+        ':artist' => $artist,
+        ':track' => $track,
+        ':link' => $link
+    );
+    
+    $query->execute($parameters);
+}
+```
+
+### UPDATE Query
+
+```php application/model/model.php
+public function updateSong($artist, $track, $link, $song_id)
+{
+    $sql = "UPDATE song SET artist = :artist, track = :track, link = :link WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(
+        ':artist' => $artist,
+        ':track' => $track,
+        ':link' => $link,
+        ':song_id' => $song_id
+    );
+    
+    $query->execute($parameters);
+}
+```
+
+### DELETE Query
+
+```php application/model/model.php
+public function deleteSong($song_id)
+{
+    $sql = "DELETE FROM song WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+    
+    $query->execute($parameters);
+}
+```
+
+## Fetch Modes
+
+### fetchAll() - Multiple Results
+
+Returns all matching rows as an array:
+
+```php
+$sql = "SELECT id, artist, track FROM song";
+$query = $this->db->prepare($sql);
+$query->execute();
+
+// Returns array of objects
+$songs = $query->fetchAll();
+
+foreach ($songs as $song) {
+    echo $song->artist; // Access as object property
+}
+```
+
+### fetch() - Single Result
+
+Returns exactly one row:
+
+```php
+$sql = "SELECT id, artist, track FROM song WHERE id = :song_id LIMIT 1";
+$query = $this->db->prepare($sql);
+$query->execute(array(':song_id' => $song_id));
+
+// Returns single object
+$song = $query->fetch();
+echo $song->artist;
+```
+
+### Aggregate Results
+
+```php application/model/model.php
+public function getAmountOfSongs()
+{
+    $sql = "SELECT COUNT(id) AS amount_of_songs FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    return $query->fetch()->amount_of_songs;
+}
+```
+
+## Error Handling
+
+MINI uses basic error handling in the Model constructor:
+
+```php application/model/model.php
+function __construct($db)
+{
+    try {
+        $this->db = $db;
+    } catch (PDOException $e) {
+        exit('Database connection could not be established.');
+    }
+}
+```
+
+<Warning>
+  In production environments, avoid displaying detailed error messages to users. Log errors instead and show generic error pages.
+</Warning>
+
+## Security Best Practices
+
+### Automatic Input Escaping
+
+<Note>
+  PDO prepared statements automatically escape all input, making SQL injection impossible when used correctly. **Never** concatenate user input directly into SQL strings.
+</Note>
+
+```php
+// ✅ CORRECT - Uses prepared statements
+$sql = "SELECT * FROM song WHERE id = :id";
+$query->execute(array(':id' => $user_input));
+
+// ❌ WRONG - Vulnerable to SQL injection
+$sql = "SELECT * FROM song WHERE id = " . $user_input;
+$query->execute();
+```
+
+### Output Escaping in Views
+
+While PDO handles input security, always escape output in views:
+
+```php application/view/songs/index.php
+<?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?>
+```
+
+### Data Storage Philosophy
+
+MINI doesn't strip tags or sanitize input before storage:
+
+- Data is stored 100% original (allows HTML/JS if needed)
+- Input is escaped by PDO during queries
+- Output is escaped in views with `htmlspecialchars()`
+
+This approach maintains data integrity while ensuring security.
+
+## Accessing the Database
+
+The database connection is available in all controllers:
+
+```php
+class MyController extends Controller
+{
+    public function myMethod()
+    {
+        // Access via model (recommended)
+        $songs = $this->model->getAllSongs();
+        
+        // Direct database access (not recommended)
+        $query = $this->db->prepare($sql);
+    }
+}
+```
+
+<Note>
+  **Best practice:** Keep all database queries in the Model class, not in Controllers. This maintains proper separation of concerns.
+</Note>
+
+## Common Patterns
+
+### Checking if Result Exists
+
+```php
+$song = $this->model->getSong($song_id);
+
+if ($song) {
+    // Song exists
+    echo $song->artist;
+} else {
+    // Song not found
+    header('location: ' . URL . 'error');
+}
+```
+
+### Counting Results
+
+```php
+$songs = $this->model->getAllSongs();
+$count = count($songs);
+
+// Or use SQL COUNT()
+$count = $this->model->getAmountOfSongs();
+```
+
+### Debugging Queries
+
+While MINI doesn't include a debug helper by default, you can debug queries:
+
+```php
+$sql = "SELECT * FROM song WHERE id = :id";
+$parameters = array(':id' => $song_id);
+
+// Debug the query
+var_dump($sql);
+var_dump($parameters);
+
+$query = $this->db->prepare($sql);
+$query->execute($parameters);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CRUD Operations" icon="database" href="/guides/crud-operations">
+    Learn how to implement complete Create, Read, Update, Delete functionality
+  </Card>
+  
+  <Card title="AJAX Integration" icon="bolt" href="/guides/ajax">
+    Add dynamic AJAX functionality to your application
+  </Card>
+</CardGroup>

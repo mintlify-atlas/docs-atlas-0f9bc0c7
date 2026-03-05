@@ -1,0 +1,352 @@
+---
+title: "Controller Class"
+description: "Base controller class with database and model access"
+---
+
+## Overview
+
+The `Controller` class is the base class that all controllers in MINI extend. It provides automatic database connection and model loading.
+
+Located at: `application/core/controller.php`
+
+## Class Definition
+
+```php controller.php
+class Controller
+{
+    /**
+     * @var null Database Connection
+     */
+    public $db = null;
+
+    /**
+     * @var null Model
+     */
+    public $model = null;
+
+    /**
+     * Whenever controller is created, open a database connection too and load "the model".
+     */
+    function __construct()
+    {
+        $this->openDatabaseConnection();
+        $this->loadModel();
+    }
+}
+```
+
+## Properties
+
+<ParamField path="db" type="PDO|null">
+  PDO database connection instance. Automatically initialized on controller creation.
+</ParamField>
+
+<ParamField path="model" type="Model|null">
+  Model instance with access to all database operations. Automatically loaded on controller creation.
+</ParamField>
+
+## Constructor
+
+### `__construct()`
+
+Automatically called when a controller is instantiated. Sets up database and model.
+
+**Process:**
+
+<Steps>
+  <Step title="Open Database Connection">
+    Calls `openDatabaseConnection()` to create a PDO connection using credentials from `config.php`.
+  </Step>
+  
+  <Step title="Load Model">
+    Calls `loadModel()` to instantiate the Model class and pass the database connection to it.
+  </Step>
+</Steps>
+
+**Example:**
+
+```php
+// When Application instantiates a controller:
+require APP . 'controller/songs.php';
+$controller = new Songs();
+
+// The Songs controller automatically has:
+// - $this->db (PDO connection)
+// - $this->model (Model instance with database access)
+```
+
+## Methods
+
+### `openDatabaseConnection()`
+
+Establishes a PDO connection to the database using configuration from `config.php`.
+
+```php
+private function openDatabaseConnection()
+{
+    // set the (optional) options of the PDO connection
+    // fetch mode FETCH_OBJ returns results as objects
+    $options = array(
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ, 
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
+    );
+
+    // generate a database connection, using the PDO connector
+    $this->db = new PDO(
+        DB_TYPE . ':host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET, 
+        DB_USER, 
+        DB_PASS, 
+        $options
+    );
+}
+```
+
+**PDO Options:**
+
+<Accordion title="PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ">
+  Results are returned as objects, allowing access like `$result->field_name` instead of `$result['field_name']`.
+  
+  ```php
+  // With FETCH_OBJ:
+  $song = $query->fetch();
+  echo $song->artist; // object property access
+  
+  // With FETCH_ASSOC:
+  echo $song['artist']; // array access
+  ```
+</Accordion>
+
+<Accordion title="PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING">
+  PDO will emit PHP warnings for database errors instead of silent failures. Useful for debugging during development.
+</Accordion>
+
+**Configuration:**
+
+The connection uses these constants from `application/config/config.php`:
+
+```php
+define('DB_TYPE', 'mysql');
+define('DB_HOST', '127.0.0.1');
+define('DB_NAME', 'mini');
+define('DB_USER', 'root');
+define('DB_PASS', 'your_password');
+define('DB_CHARSET', 'utf8');
+```
+
+### `loadModel()`
+
+Loads the Model class and passes the database connection to it.
+
+```php
+public function loadModel()
+{
+    require APP . 'model/model.php';
+    // create new "model" (and pass the database connection)
+    $this->model = new Model($this->db);
+}
+```
+
+After this call, `$this->model` is available in all controller methods.
+
+## Extending Controller
+
+All application controllers extend the base `Controller` class:
+
+```php home.php
+class Home extends Controller
+{
+    /**
+     * PAGE: index
+     */
+    public function index()
+    {
+        // load views
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+}
+```
+
+<Note>
+  The base constructor is automatically called, so every controller has immediate access to `$this->db` and `$this->model`.
+</Note>
+
+## Usage Examples
+
+### Accessing the Database Directly
+
+```php
+class Songs extends Controller
+{
+    public function customQuery()
+    {
+        // Direct PDO access via $this->db
+        $sql = "SELECT * FROM song WHERE artist LIKE :search";
+        $query = $this->db->prepare($sql);
+        $query->execute([':search' => '%Beatles%']);
+        $results = $query->fetchAll();
+        
+        // ... use $results in view
+    }
+}
+```
+
+### Using the Model
+
+```php
+class Songs extends Controller
+{
+    public function index()
+    {
+        // Access model methods via $this->model
+        $songs = $this->model->getAllSongs();
+        $amount = $this->model->getAmountOfSongs();
+        
+        // Pass data to view
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/songs/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+}
+```
+
+### Creating a Custom Controller
+
+<Steps>
+  <Step title="Create Controller File">
+    Create a new file in `application/controller/`, e.g., `blog.php`.
+  </Step>
+  
+  <Step title="Extend Controller Class">
+    ```php blog.php
+    class Blog extends Controller
+    {
+        public function index()
+        {
+            // $this->db and $this->model are automatically available
+            $posts = $this->model->getAllPosts();
+            
+            require APP . 'view/_templates/header.php';
+            require APP . 'view/blog/index.php';
+            require APP . 'view/_templates/footer.php';
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Access via URL">
+    Navigate to `example.com/blog` to call the `index()` method.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Tip>
+  **Use the Model for Database Logic**
+  
+  While you can access `$this->db` directly, it's better to put database queries in the Model class for better organization and reusability.
+  
+  ```php
+  // Good:
+  $songs = $this->model->getAllSongs();
+  
+  // Less ideal:
+  $query = $this->db->prepare("SELECT * FROM song");
+  $query->execute();
+  $songs = $query->fetchAll();
+  ```
+</Tip>
+
+<Warning>
+  **Don't Put Business Logic in Views**
+  
+  Controllers should prepare all data before loading views. Views should only display data, not query the database or perform calculations.
+</Warning>
+
+## Common Patterns
+
+### POST Request Handling
+
+```php
+public function add()
+{
+    if (isset($_POST['submit_add_song'])) {
+        // Process form submission
+        $this->model->addSong(
+            $_POST['artist'], 
+            $_POST['track'], 
+            $_POST['link']
+        );
+        
+        // Redirect after processing
+        header('location: ' . URL . 'songs');
+    }
+}
+```
+
+### Loading Multiple Models
+
+```php
+class Dashboard extends Controller
+{
+    public function index()
+    {
+        // Load default model
+        $stats = $this->model->getStats();
+        
+        // Load additional models if needed
+        require APP . 'model/user_model.php';
+        $userModel = new UserModel($this->db);
+        $users = $userModel->getRecentUsers();
+        
+        // ... load view
+    }
+}
+```
+
+### AJAX Responses
+
+```php
+public function ajaxGetData()
+{
+    $data = $this->model->getSomeData();
+    
+    // Return JSON instead of loading views
+    header('Content-Type: application/json');
+    echo json_encode($data);
+    exit();
+}
+```
+
+## Error Handling
+
+<Accordion title="Database Connection Failures">
+  If the database connection fails in `openDatabaseConnection()`, PDO will throw an exception. Ensure your database credentials in `config.php` are correct.
+  
+  ```php
+  // In Model constructor:
+  try {
+      $this->db = $db;
+  } catch (PDOException $e) {
+      exit('Database connection could not be established.');
+  }
+  ```
+</Accordion>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Model Class" icon="database" href="/api/model">
+    Learn about the Model class and database operations
+  </Card>
+  <Card title="Controllers Guide" icon="file-code" href="/concepts/controllers">
+    Detailed guide on creating controllers
+  </Card>
+  <Card title="Database Guide" icon="server" href="/guides/database">
+    Working with databases in MINI
+  </Card>
+  <Card title="CRUD Operations" icon="list-check" href="/guides/crud-operations">
+    Complete CRUD examples
+  </Card>
+</CardGroup>

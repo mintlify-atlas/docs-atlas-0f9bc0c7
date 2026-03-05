@@ -1,80 +1,529 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Build your first MINI application in minutes
 ---
 
-## Get started in three steps
+## Get Up and Running
 
-Get your documentation site running locally and make your first customization.
+This guide will help you create your first controller, view, and understand the MINI framework's core concepts.
 
-### Step 1: Set up your local environment
+<Note>
+  Make sure you've completed the [installation](/installation) before starting this guide.
+</Note>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+## Understanding the URL Structure
 
-### Step 2: Deploy your changes
+MINI's URL structure is intuitive and self-explanatory. URLs directly map to controllers and their methods:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+```
+http://example.com/controller/method/parameter1/parameter2
+```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+### URL Routing Examples
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+| URL | Controller | Method | Parameters |
+|-----|------------|--------|------------|
+| `example.com` | `home.php` | `index()` | none |
+| `example.com/home` | `home.php` | `index()` | none |
+| `example.com/home/exampleOne` | `home.php` | `exampleOne()` | none |
+| `example.com/songs` | `songs.php` | `index()` | none |
+| `example.com/songs/edit/17` | `songs.php` | `edit()` | `17` |
 
-### Step 3: Go live
+<Info>
+  The default controller is `home` and the default method is `index()`. Both are called when no specific controller or method is provided in the URL.
+</Info>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Project Structure
 
-## Next steps
+Understand the MINI directory structure:
 
-Now that you have your docs running, explore these key features:
+```
+mini/
+├── application/
+│   ├── config/
+│   │   └── config.php           # Configuration file
+│   ├── controller/
+│   │   ├── home.php             # Home controller
+│   │   ├── songs.php            # Songs controller (CRUD example)
+│   │   └── problem.php          # Error controller
+│   ├── core/
+│   │   ├── application.php      # Application routing logic
+│   │   └── controller.php       # Base controller class
+│   ├── model/
+│   │   └── model.php            # Database model
+│   ├── view/
+│   │   ├── _templates/          # Header and footer templates
+│   │   ├── home/                # Views for home controller
+│   │   └── songs/               # Views for songs controller
+│   └── libs/
+│       └── helper.php           # Helper functions (PDO debugger)
+├── public/
+│   ├── index.php                # Application entry point
+│   ├── .htaccess                # URL rewriting rules
+│   └── css/                     # CSS files
+└── _install/
+    └── *.sql                    # Database setup files
+```
+
+## Create Your First Controller
+
+Let's create a simple "Blog" controller.
+
+<Steps>
+  <Step title="Create the Controller File">
+    Create a new file: `application/controller/blog.php`
+
+    ```php application/controller/blog.php
+    <?php
+
+    /**
+     * Class Blog
+     * Handles blog-related pages and actions
+     */
+    class Blog extends Controller
+    {
+        /**
+         * PAGE: index
+         * This is the main blog listing page
+         * URL: http://yourproject/blog or http://yourproject/blog/index
+         */
+        public function index()
+        {
+            // Load views
+            require APP . 'view/_templates/header.php';
+            require APP . 'view/blog/index.php';
+            require APP . 'view/_templates/footer.php';
+        }
+
+        /**
+         * PAGE: article
+         * This shows a single blog article
+         * URL: http://yourproject/blog/article/5
+         */
+        public function article($id)
+        {
+            // For now, just pass the ID to the view
+            // In a real app, you'd fetch article data from the database
+            $article_id = $id;
+
+            // Load views
+            require APP . 'view/_templates/header.php';
+            require APP . 'view/blog/article.php';
+            require APP . 'view/_templates/footer.php';
+        }
+    }
+    ```
+
+    <Info>
+      Controllers must extend the `Controller` base class, which provides database access via `$this->db` and model access via `$this->model`.
+    </Info>
+  </Step>
+
+  <Step title="Create the View Directory">
+    Create a directory for blog views:
+
+    ```bash
+    mkdir application/view/blog
+    ```
+  </Step>
+
+  <Step title="Create the Index View">
+    Create `application/view/blog/index.php`:
+
+    ```php application/view/blog/index.php
+    <div class="container">
+        <h1>Blog</h1>
+        <p>Welcome to the blog!</p>
+        
+        <h2>Recent Articles</h2>
+        <ul>
+            <li><a href="<?php echo URL; ?>blog/article/1">My First Article</a></li>
+            <li><a href="<?php echo URL; ?>blog/article/2">Learning MINI Framework</a></li>
+            <li><a href="<?php echo URL; ?>blog/article/3">PHP Best Practices</a></li>
+        </ul>
+    </div>
+    ```
+
+    <Note>
+      The `URL` constant contains your application's base URL, ensuring links work in any environment or sub-folder.
+    </Note>
+  </Step>
+
+  <Step title="Create the Article View">
+    Create `application/view/blog/article.php`:
+
+    ```php application/view/blog/article.php
+    <div class="container">
+        <h1>Article #<?php echo htmlspecialchars($article_id, ENT_QUOTES, 'UTF-8'); ?></h1>
+        <p>This is article number <?php echo htmlspecialchars($article_id, ENT_QUOTES, 'UTF-8'); ?>.</p>
+        <p>In a real application, this would display the actual article content from the database.</p>
+        
+        <a href="<?php echo URL; ?>blog">← Back to blog</a>
+    </div>
+    ```
+
+    <Warning>
+      Always use `htmlspecialchars()` when outputting user-provided or dynamic content to prevent XSS attacks.
+    </Warning>
+  </Step>
+
+  <Step title="Test Your Controller">
+    Open your browser and navigate to:
+
+    ```
+    http://localhost/mini/blog
+    ```
+
+    You should see your blog listing. Click on an article to see it in action!
+  </Step>
+</Steps>
+
+## Working with the Database
+
+Now let's enhance our blog to fetch real data from the database.
+
+<Steps>
+  <Step title="Create a Database Table">
+    Add a blog posts table to your database:
+
+    ```sql
+    CREATE TABLE post (
+        id INT NOT NULL AUTO_INCREMENT,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+    );
+
+    -- Insert some sample data
+    INSERT INTO post (title, content) VALUES
+    ('Getting Started with MINI', 'MINI is an extremely simple PHP framework...'),
+    ('Database Operations', 'Working with PDO in MINI is straightforward...'),
+    ('Clean URLs', 'MINI provides beautiful clean URLs out of the box...');
+    ```
+  </Step>
+
+  <Step title="Add Model Methods">
+    Edit `application/model/model.php` and add blog methods:
+
+    ```php application/model/model.php
+    /**
+     * Get all blog posts
+     */
+    public function getAllPosts()
+    {
+        $sql = "SELECT id, title, content, created_at FROM post ORDER BY created_at DESC";
+        $query = $this->db->prepare($sql);
+        $query->execute();
+        
+        return $query->fetchAll();
+    }
+
+    /**
+     * Get a single blog post by ID
+     * @param int $post_id
+     */
+    public function getPost($post_id)
+    {
+        $sql = "SELECT id, title, content, created_at FROM post WHERE id = :post_id LIMIT 1";
+        $query = $this->db->prepare($sql);
+        $parameters = array(':post_id' => $post_id);
+        
+        // For debugging, you can use:
+        // echo Helper::debugPDO($sql, $parameters);
+        
+        $query->execute($parameters);
+        
+        return $query->fetch();
+    }
+    ```
+
+    <Info>
+      PDO automatically escapes all parameters, protecting against SQL injection. No need to manually sanitize input.
+    </Info>
+  </Step>
+
+  <Step title="Update the Controller">
+    Modify `application/controller/blog.php` to use the model:
+
+    ```php application/controller/blog.php
+    public function index()
+    {
+        // Get all posts from the database
+        $posts = $this->model->getAllPosts();
+
+        // Load views
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/blog/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+
+    public function article($id)
+    {
+        // Get the specific post from the database
+        $post = $this->model->getPost($id);
+
+        // Load views
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/blog/article.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    ```
+  </Step>
+
+  <Step title="Update the Views">
+    Update `application/view/blog/index.php` to display real data:
+
+    ```php application/view/blog/index.php
+    <div class="container">
+        <h1>Blog</h1>
+        
+        <?php if (!empty($posts)) { ?>
+            <?php foreach ($posts as $post) { ?>
+                <article style="margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid #ddd;">
+                    <h2>
+                        <a href="<?php echo URL; ?>blog/article/<?php echo $post->id; ?>">
+                            <?php echo htmlspecialchars($post->title, ENT_QUOTES, 'UTF-8'); ?>
+                        </a>
+                    </h2>
+                    <p>
+                        <?php echo htmlspecialchars(substr($post->content, 0, 150), ENT_QUOTES, 'UTF-8'); ?>...
+                    </p>
+                    <small>Posted on: <?php echo htmlspecialchars($post->created_at, ENT_QUOTES, 'UTF-8'); ?></small>
+                </article>
+            <?php } ?>
+        <?php } else { ?>
+            <p>No posts available.</p>
+        <?php } ?>
+    </div>
+    ```
+
+    Update `application/view/blog/article.php`:
+
+    ```php application/view/blog/article.php
+    <div class="container">
+        <?php if (isset($post) && $post) { ?>
+            <article>
+                <h1><?php echo htmlspecialchars($post->title, ENT_QUOTES, 'UTF-8'); ?></h1>
+                <p><small>Posted on: <?php echo htmlspecialchars($post->created_at, ENT_QUOTES, 'UTF-8'); ?></small></p>
+                <div>
+                    <?php echo nl2br(htmlspecialchars($post->content, ENT_QUOTES, 'UTF-8')); ?>
+                </div>
+            </article>
+            <br>
+            <a href="<?php echo URL; ?>blog">← Back to blog</a>
+        <?php } else { ?>
+            <p>Post not found.</p>
+            <a href="<?php echo URL; ?>blog">← Back to blog</a>
+        <?php } ?>
+    </div>
+    ```
+  </Step>
+
+  <Step title="Test Database Integration">
+    Refresh `http://localhost/mini/blog` to see real posts from the database!
+  </Step>
+</Steps>
+
+## Debugging PDO Queries
+
+MINI includes a helpful PDO debugger. Use it to see the actual SQL being executed:
+
+```php
+$sql = "SELECT id, title FROM post WHERE id = :post_id LIMIT 1";
+$query = $this->db->prepare($sql);
+$parameters = array(':post_id' => $post_id);
+
+// Debug the query (shows the SQL with parameters replaced)
+echo Helper::debugPDO($sql, $parameters);
+
+$query->execute($parameters);
+```
+
+Output:
+```sql
+SELECT id, title FROM post WHERE id = '5' LIMIT 1
+```
+
+## CRUD Operations Example
+
+MINI includes a complete CRUD (Create, Read, Update, Delete) example in the `songs` controller. Study these files:
+
+- **Controller**: `application/controller/songs.php`
+- **Model**: `application/model/model.php`
+- **Views**: `application/view/songs/`
+
+### Quick CRUD Reference
+
+<CodeGroup>
+```php Create
+public function addSong($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':artist' => $artist, ':track' => $track, ':link' => $link);
+    $query->execute($parameters);
+}
+```
+
+```php Read
+public function getAllSongs()
+{
+    $sql = "SELECT id, artist, track, link FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    return $query->fetchAll();
+}
+```
+
+```php Update
+public function updateSong($artist, $track, $link, $song_id)
+{
+    $sql = "UPDATE song SET artist = :artist, track = :track, link = :link WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':artist' => $artist, ':track' => $track, ':link' => $link, ':song_id' => $song_id);
+    $query->execute($parameters);
+}
+```
+
+```php Delete
+public function deleteSong($song_id)
+{
+    $sql = "DELETE FROM song WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+    $query->execute($parameters);
+}
+```
+</CodeGroup>
+
+## Key Concepts
+
+### The Application Flow
+
+<Steps>
+  <Step title="Entry Point">
+    All requests go through `public/index.php`, which loads the framework and creates an `Application` instance.
+  </Step>
+
+  <Step title="URL Parsing">
+    The `Application` class (`application/core/application.php`) parses the URL and determines which controller and method to call.
+  </Step>
+
+  <Step title="Controller Loading">
+    The specified controller is loaded from `application/controller/`, and the method is called with any URL parameters.
+  </Step>
+
+  <Step title="View Rendering">
+    The controller loads views from `application/view/`, typically including header, content, and footer templates.
+  </Step>
+</Steps>
+
+### Security Best Practices
 
 <CardGroup cols={2}>
+  <Card title="Output Escaping" icon="shield">
+    Always use `htmlspecialchars($data, ENT_QUOTES, 'UTF-8')` when outputting dynamic content
+  </Card>
+  
+  <Card title="PDO Prepared Statements" icon="database">
+    Use PDO with parameter binding for all database queries (automatic SQL injection protection)
+  </Card>
+  
+  <Card title="Public Folder" icon="folder">
+    Only `public/` is web-accessible. Application code is protected from direct access
+  </Card>
+  
+  <Card title="Input Validation" icon="check-circle">
+    Always validate and sanitize user input on the server side
+  </Card>
+</CardGroup>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+## Common Patterns
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+### Passing Data to Views
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+Simply create variables before requiring the view:
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+```php
+public function index()
+{
+    // Create variables
+    $posts = $this->model->getAllPosts();
+    $total_posts = count($posts);
+    $page_title = "Blog Home";
 
+    // Variables are available in the views
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/blog/index.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+### Redirecting
+
+```php
+// Redirect to another page
+header('location: ' . URL . 'blog');
+exit();
+```
+
+### Working with POST Data
+
+```php
+public function create()
+{
+    if (isset($_POST["submit_add_post"])) {
+        $title = $_POST["title"];
+        $content = $_POST["content"];
+        
+        // Add to database
+        $this->model->addPost($title, $content);
+        
+        // Redirect
+        header('location: ' . URL . 'blog');
+        exit();
+    }
+    
+    // Show form
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/blog/create.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Study the Songs Example" icon="music">
+    Explore `application/controller/songs.php` for a complete CRUD implementation
+  </Card>
+  
+  <Card title="Customize the Configuration" icon="gear">
+    Review `application/config/config.php` to customize error reporting, database settings, and more
+  </Card>
+  
+  <Card title="Add Your Own Models" icon="database">
+    Expand `application/model/model.php` with your own data access methods
+  </Card>
+  
+  <Card title="Explore AJAX" icon="bolt">
+    Check out the AJAX example in the demo application
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/panique/mini/issues">
+    Report bugs or request features
+  </Card>
+  
+  <Card title="Dev Metal Blog" icon="blog" href="http://www.dev-metal.com">
+    Read in-depth tutorials and articles
+  </Card>
 </CardGroup>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Remember: MINI is intentionally simple. If you need more features, consider [MINI2](https://github.com/panique/mini2) or [MINI3](https://github.com/panique/mini3).
 </Note>

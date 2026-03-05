@@ -1,0 +1,142 @@
+---
+title: Introduction
+description: Learn about MINI, an extremely simple barebone PHP micro-framework
+---
+
+## What is MINI?
+
+MINI is an extremely simple and easy to understand skeleton PHP application, reduced to the max. It's a barebone micro-framework designed for developers who want to build simple web applications without the complexity of full-featured frameworks.
+
+<Note>
+  MINI is **NOT** a professional framework and does not come with all the features that enterprise frameworks provide. It's designed for simplicity and ease of use.
+</Note>
+
+## Philosophy
+
+MINI follows a straightforward philosophy:
+
+- **Simplicity First**: No complex abstractions or steep learning curves
+- **Native PHP**: Uses only native PHP code, so you don't need to learn framework-specific syntax
+- **Minimal Dependencies**: Runs with minimal setup and configuration
+- **Clean URLs**: Beautiful, SEO-friendly URL structure out of the box
+- **Easy to Understand**: Clean, commented codebase that's easy to learn from
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Extremely Simple" icon="feather">
+    Reduced to the absolute essentials with a clean, understandable structure
+  </Card>
+  
+  <Card title="Clean URLs" icon="link">
+    Beautiful URL routing with mod_rewrite (e.g., `example.com/songs/edit/17`)
+  </Card>
+  
+  <Card title="PDO Database" icon="database">
+    Secure database access using PDO with built-in debugging tools
+  </Card>
+  
+  <Card title="CRUD Examples" icon="code">
+    Includes working examples of Create, Read, Update, and Delete operations
+  </Card>
+  
+  <Card title="PSR-Compliant" icon="check">
+    Follows PSR-1/2 coding guidelines for clean, maintainable code
+  </Card>
+  
+  <Card title="AJAX Ready" icon="bolt">
+    Includes demo AJAX implementation for dynamic functionality
+  </Card>
+</CardGroup>
+
+## When to Use MINI
+
+MINI is perfect for:
+
+- **Quick Prototypes**: Rapidly building proof-of-concept applications
+- **Learning Projects**: Understanding MVC architecture without framework complexity
+- **Small Websites**: Simple sites with a few pages and basic database operations
+- **Agency Work**: Fast frontend-driven projects with minimal backend requirements
+- **Teaching**: Demonstrating PHP concepts without framework overhead
+
+<Warning>
+  For large-scale enterprise applications with complex requirements, consider using a full-featured framework like Laravel, Symfony, or check out MINI's bigger siblings: MINI2 or MINI3.
+</Warning>
+
+## When NOT to Use MINI
+
+MINI might not be suitable if you need:
+
+- Complex authentication and authorization systems
+- Built-in ORM with advanced relationships
+- API development with REST/GraphQL support
+- Extensive middleware and event systems
+- Built-in testing frameworks
+- Large team collaboration with strict architectural patterns
+
+## The MINI Family
+
+MINI has several related projects for different use cases:
+
+### TINY
+
+[TINY](https://github.com/panique/tiny) is MINI's smaller brother. It's similar to MINI but runs **without mod_rewrite** in nearly every environment. Perfect for:
+- Environments where you can't enable mod_rewrite
+- Quick local prototyping
+- Shared hosting with limited configuration options
+
+### MINI2
+
+[MINI2](https://github.com/panique/mini2) is MINI's bigger brother. Built using the Slim framework, it includes:
+- SASS compilation
+- Twig templating engine
+- More modern architecture
+- Enhanced features while maintaining simplicity
+
+### MINI3
+
+[MINI3](https://github.com/panique/mini3) is the successor of MINI. It features:
+- PSR-4 autoloading
+- Multiple model classes
+- Real namespaces
+- Original MINI native application structure (without Slim)
+- More professional architecture
+
+## How MINI Works
+
+MINI uses a simple MVC (Model-View-Controller) pattern:
+
+```php
+// URL: example.com/home/exampleOne
+// Routes to: application/controller/home.php -> exampleOne() method
+
+public function exampleOne()
+{
+    // Load views
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/home/example_one.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+The URL structure directly maps to controllers and methods:
+
+- `example.com` → `home.php` → `index()` method (default)
+- `example.com/songs` → `songs.php` → `index()` method
+- `example.com/songs/edit/17` → `songs.php` → `edit()` method with parameter `17`
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up MINI on your local or production environment
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first MINI application in minutes
+  </Card>
+</CardGroup>
+
+## License
+
+MINI is open-source software licensed under the [MIT License](http://opensource.org/licenses/MIT). You can use and modify it freely for private or commercial projects.

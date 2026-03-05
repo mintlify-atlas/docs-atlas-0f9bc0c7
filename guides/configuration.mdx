@@ -1,0 +1,616 @@
+---
+title: Configuration Guide
+description: Complete guide to configuring your MINI PHP application
+---
+
+All configuration for MINI is stored in a single file: `application/config/config.php`. This guide explains every configuration option available.
+
+## Configuration File Overview
+
+The config file uses PHP constants defined with `define()` for configuration values:
+
+```php application/config/config.php
+define('SETTING_NAME', 'value');
+```
+
+<Note>
+  Constants are used instead of variables because they cannot be accidentally changed during runtime, making your application more secure and predictable.
+</Note>
+
+## Environment Settings
+
+### Error Reporting
+
+Control how PHP errors are displayed:
+
+```php application/config/config.php
+define('ENVIRONMENT', 'development');
+
+if (ENVIRONMENT == 'development' || ENVIRONMENT == 'dev') {
+    error_reporting(E_ALL);
+    ini_set("display_errors", 1);
+}
+```
+
+<Tabs>
+  <Tab title="Development">
+    ```php
+    define('ENVIRONMENT', 'development');
+    ```
+    
+    **Behavior:**
+    - Shows all errors and warnings
+    - Displays errors directly on the page
+    - Useful for debugging during development
+    
+    <Warning>
+      Never use development mode in production! It exposes sensitive information to users.
+    </Warning>
+  </Tab>
+  
+  <Tab title="Production">
+    ```php
+    define('ENVIRONMENT', 'production');
+    ```
+    
+    **Behavior:**
+    - Errors are not displayed to users
+    - Only logged to server error logs
+    - More secure for public-facing applications
+    
+    <Note>
+      In production, configure PHP error logging in `php.ini` to capture errors without displaying them to users.
+    </Note>
+  </Tab>
+</Tabs>
+
+### Error Reporting Levels
+
+```php
+// Show all errors (development)
+error_reporting(E_ALL);
+
+// Show only fatal errors (production)
+error_reporting(E_ERROR | E_PARSE);
+
+// Show errors but not notices
+error_reporting(E_ALL & ~E_NOTICE);
+
+// Show no errors (not recommended)
+error_reporting(0);
+```
+
+## URL Configuration
+
+MINI automatically detects your application's URL structure:
+
+```php application/config/config.php
+define('URL_PUBLIC_FOLDER', 'public');
+define('URL_PROTOCOL', '//');
+define('URL_DOMAIN', $_SERVER['HTTP_HOST']);
+define('URL_SUB_FOLDER', str_replace(URL_PUBLIC_FOLDER, '', dirname($_SERVER['SCRIPT_NAME'])));
+define('URL', URL_PROTOCOL . URL_DOMAIN . URL_SUB_FOLDER);
+```
+
+### Understanding URL Components
+
+<AccordionGroup>
+  <Accordion title="URL_PUBLIC_FOLDER">
+    The name of the public folder that contains `index.php`.
+    
+    ```php
+    define('URL_PUBLIC_FOLDER', 'public');
+    ```
+    
+    **Default:** `public`
+    
+    **Change if:** You renamed the public folder
+    
+    ```php
+    // If you renamed it to 'web'
+    define('URL_PUBLIC_FOLDER', 'web');
+    ```
+  </Accordion>
+  
+  <Accordion title="URL_PROTOCOL">
+    The protocol part of the URL.
+    
+    ```php
+    define('URL_PROTOCOL', '//');
+    ```
+    
+    **Default:** `//` (protocol-independent)
+    
+    The `//` notation automatically uses:
+    - `http://` for non-SSL connections
+    - `https://` for SSL connections
+    
+    **Manual configuration:**
+    ```php
+    // Force HTTPS
+    define('URL_PROTOCOL', 'https://');
+    
+    // Force HTTP (not recommended)
+    define('URL_PROTOCOL', 'http://');
+    ```
+  </Accordion>
+  
+  <Accordion title="URL_DOMAIN">
+    The domain name from the HTTP request.
+    
+    ```php
+    define('URL_DOMAIN', $_SERVER['HTTP_HOST']);
+    ```
+    
+    **Auto-detected examples:**
+    - `localhost`
+    - `localhost:8000`
+    - `example.com`
+    - `www.example.com`
+    
+    **Manual override:**
+    ```php
+    // Use specific domain
+    define('URL_DOMAIN', 'www.example.com');
+    ```
+  </Accordion>
+  
+  <Accordion title="URL_SUB_FOLDER">
+    Automatically detects if your app is in a subdirectory.
+    
+    ```php
+    define('URL_SUB_FOLDER', str_replace(URL_PUBLIC_FOLDER, '', dirname($_SERVER['SCRIPT_NAME'])));
+    ```
+    
+    **Examples:**
+    
+    | Installation | URL_SUB_FOLDER |
+    |-------------|----------------|
+    | `http://localhost/` | `/` |
+    | `http://localhost/myapp/` | `/myapp/` |
+    | `http://example.com/` | `/` |
+    | `http://example.com/app/` | `/app/` |
+  </Accordion>
+  
+  <Accordion title="URL (Complete URL)">
+    The final, complete base URL for your application.
+    
+    ```php
+    define('URL', URL_PROTOCOL . URL_DOMAIN . URL_SUB_FOLDER);
+    ```
+    
+    **Auto-generated examples:**
+    - `//localhost/`
+    - `//localhost/myapp/`
+    - `//example.com/`
+    - `//www.example.com/app/`
+    
+    **Manual override (disables auto-detection):**
+    ```php
+    // Override everything
+    define('URL', 'https://www.example.com/myapp/');
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Using the URL Constant
+
+The `URL` constant is used throughout MINI for creating links:
+
+```php
+// In controllers - redirects
+header('location: ' . URL . 'songs/index');
+
+// In views - links
+<a href="<?php echo URL; ?>songs/index">View Songs</a>
+
+// In views - form actions
+<form action="<?php echo URL; ?>songs/addsong" method="POST">
+
+// In JavaScript (defined in footer.php)
+var url = "<?php echo URL; ?>";
+$.ajax(url + "/songs/ajaxGetStats");
+```
+
+### Common URL Configurations
+
+<Tabs>
+  <Tab title="Local Development">
+    ```php
+    // Usually works automatically
+    define('URL_PROTOCOL', '//');
+    define('URL_DOMAIN', $_SERVER['HTTP_HOST']);
+    // Results in: //localhost/ or //localhost:8000/
+    ```
+  </Tab>
+  
+  <Tab title="Subdirectory Installation">
+    ```php
+    // Automatically detects subdirectory
+    // No changes needed!
+    // Results in: //localhost/myapp/
+    ```
+  </Tab>
+  
+  <Tab title="Production (Auto)">
+    ```php
+    // Automatically detects domain
+    define('URL_PROTOCOL', '//');
+    define('URL_DOMAIN', $_SERVER['HTTP_HOST']);
+    // Results in: //www.example.com/
+    ```
+  </Tab>
+  
+  <Tab title="Production (Manual)">
+    ```php
+    // Manual configuration for production
+    define('URL', 'https://www.example.com/');
+    
+    // Or build it manually:
+    define('URL_PROTOCOL', 'https://');
+    define('URL_DOMAIN', 'www.example.com');
+    define('URL_SUB_FOLDER', '/');
+    define('URL', URL_PROTOCOL . URL_DOMAIN . URL_SUB_FOLDER);
+    ```
+  </Tab>
+</Tabs>
+
+## Database Configuration
+
+Database connection settings:
+
+```php application/config/config.php
+define('DB_TYPE', 'mysql');
+define('DB_HOST', '127.0.0.1');
+define('DB_NAME', 'mini');
+define('DB_USER', 'root');
+define('DB_PASS', 'your_password');
+define('DB_CHARSET', 'utf8');
+```
+
+### Database Settings Explained
+
+<AccordionGroup>
+  <Accordion title="DB_TYPE - Database Type">
+    The PDO driver to use for database connection.
+    
+    ```php
+    define('DB_TYPE', 'mysql');
+    ```
+    
+    **Supported values:**
+    - `mysql` - MySQL or MariaDB (most common)
+    - `pgsql` - PostgreSQL
+    - `sqlite` - SQLite
+    
+    **Examples:**
+    ```php
+    // PostgreSQL
+    define('DB_TYPE', 'pgsql');
+    
+    // SQLite (also change DB_HOST)
+    define('DB_TYPE', 'sqlite');
+    define('DB_HOST', '/path/to/database.db');
+    ```
+  </Accordion>
+  
+  <Accordion title="DB_HOST - Database Server">
+    The hostname or IP address of your database server.
+    
+    ```php
+    define('DB_HOST', '127.0.0.1');
+    ```
+    
+    **Common values:**
+    - `127.0.0.1` - Local MySQL server
+    - `localhost` - Local MySQL server (socket connection)
+    - `mysql` - Docker container name
+    - `db.example.com` - Remote database server
+    - `192.168.1.100:3307` - Custom port
+  </Accordion>
+  
+  <Accordion title="DB_NAME - Database Name">
+    The name of the database to connect to.
+    
+    ```php
+    define('DB_NAME', 'mini');
+    ```
+    
+    Must match the database you created during installation.
+  </Accordion>
+  
+  <Accordion title="DB_USER - Database Username">
+    The username for database authentication.
+    
+    ```php
+    define('DB_USER', 'root');
+    ```
+    
+    <Warning>
+      Never use `root` in production! Create a dedicated user with limited permissions.
+    </Warning>
+    
+    **Production example:**
+    ```php
+    define('DB_USER', 'mini_app_user');
+    ```
+  </Accordion>
+  
+  <Accordion title="DB_PASS - Database Password">
+    The password for database authentication.
+    
+    ```php
+    define('DB_PASS', 'your_password');
+    ```
+    
+    <Warning>
+      Use strong passwords in production and consider storing credentials in environment variables instead of the config file.
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="DB_CHARSET - Character Encoding">
+    The character set for database communication.
+    
+    ```php
+    define('DB_CHARSET', 'utf8');
+    ```
+    
+    **Recommended values:**
+    - `utf8` - Standard UTF-8 (good for most use cases)
+    - `utf8mb4` - Full UTF-8 support including emojis
+    
+    ```php
+    // Support emojis and special characters
+    define('DB_CHARSET', 'utf8mb4');
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Environment-Specific Database Config
+
+Use different database settings for development vs production:
+
+```php application/config/config.php
+if (ENVIRONMENT == 'development') {
+    define('DB_HOST', '127.0.0.1');
+    define('DB_NAME', 'mini_dev');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+} else {
+    define('DB_HOST', 'production-db.example.com');
+    define('DB_NAME', 'mini_prod');
+    define('DB_USER', 'mini_app_user');
+    define('DB_PASS', 'secure_production_password');
+}
+
+define('DB_TYPE', 'mysql');
+define('DB_CHARSET', 'utf8mb4');
+```
+
+## Complete Configuration Examples
+
+### Development Environment
+
+```php application/config/config.php
+<?php
+
+// Development mode - show all errors
+define('ENVIRONMENT', 'development');
+
+if (ENVIRONMENT == 'development' || ENVIRONMENT == 'dev') {
+    error_reporting(E_ALL);
+    ini_set("display_errors", 1);
+}
+
+// URL - auto-detected
+define('URL_PUBLIC_FOLDER', 'public');
+define('URL_PROTOCOL', '//');
+define('URL_DOMAIN', $_SERVER['HTTP_HOST']);
+define('URL_SUB_FOLDER', str_replace(URL_PUBLIC_FOLDER, '', dirname($_SERVER['SCRIPT_NAME'])));
+define('URL', URL_PROTOCOL . URL_DOMAIN . URL_SUB_FOLDER);
+
+// Database - local development
+define('DB_TYPE', 'mysql');
+define('DB_HOST', '127.0.0.1');
+define('DB_NAME', 'mini');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_CHARSET', 'utf8');
+```
+
+### Production Environment
+
+```php application/config/config.php
+<?php
+
+// Production mode - hide errors from users
+define('ENVIRONMENT', 'production');
+
+if (ENVIRONMENT == 'development' || ENVIRONMENT == 'dev') {
+    error_reporting(E_ALL);
+    ini_set("display_errors", 1);
+}
+
+// URL - manual for production
+define('URL', 'https://www.example.com/');
+
+// Database - production server
+define('DB_TYPE', 'mysql');
+define('DB_HOST', 'db.example.com');
+define('DB_NAME', 'mini_production');
+define('DB_USER', 'mini_app_user');
+define('DB_PASS', 'secure_production_password_here');
+define('DB_CHARSET', 'utf8mb4');
+```
+
+### Docker Environment
+
+```php application/config/config.php
+<?php
+
+define('ENVIRONMENT', getenv('APP_ENV') ?: 'production');
+
+if (ENVIRONMENT == 'development' || ENVIRONMENT == 'dev') {
+    error_reporting(E_ALL);
+    ini_set("display_errors", 1);
+}
+
+// URL from environment variable
+define('URL', getenv('APP_URL') ?: '//localhost/');
+
+// Database from Docker environment variables
+define('DB_TYPE', 'mysql');
+define('DB_HOST', getenv('DB_HOST') ?: 'mysql');
+define('DB_NAME', getenv('DB_NAME') ?: 'mini');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: 'root');
+define('DB_CHARSET', 'utf8mb4');
+```
+
+## Security Best Practices
+
+<AccordionGroup>
+  <Accordion title="Don't commit credentials to version control">
+    Add `config.php` to `.gitignore`:
+    
+    ```bash .gitignore
+    application/config/config.php
+    ```
+    
+    Create a template file instead:
+    
+    ```php application/config/config.example.php
+    <?php
+    // Copy this file to config.php and update with your settings
+    
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'database_name_here');
+    define('DB_USER', 'username_here');
+    define('DB_PASS', 'password_here');
+    ```
+  </Accordion>
+  
+  <Accordion title="Use environment variables">
+    Store sensitive data in environment variables:
+    
+    ```php application/config/config.php
+    define('DB_PASS', getenv('DB_PASSWORD'));
+    ```
+    
+    Set in your server environment:
+    ```bash
+    export DB_PASSWORD="your_secure_password"
+    ```
+  </Accordion>
+  
+  <Accordion title="Restrict file permissions">
+    Make config.php readable only by the web server:
+    
+    ```bash
+    chmod 600 application/config/config.php
+    chown www-data:www-data application/config/config.php
+    ```
+  </Accordion>
+  
+  <Accordion title="Use strong database passwords">
+    Generate secure passwords:
+    
+    ```bash
+    # Generate a random password
+    openssl rand -base64 32
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Accessing Configuration Values
+
+Configuration constants are available throughout your application:
+
+```php
+// In controllers
+class MyController extends Controller
+{
+    public function index()
+    {
+        // Access URL constant
+        header('location: ' . URL . 'home/index');
+        
+        // Check environment
+        if (ENVIRONMENT == 'development') {
+            // Development-only code
+        }
+    }
+}
+
+// In views
+<a href="<?php echo URL; ?>songs/index">Songs</a>
+
+// In JavaScript (footer.php)
+var url = "<?php echo URL; ?>";
+```
+
+<Note>
+  Database constants (DB_HOST, DB_USER, etc.) are only used in `application/core/controller.php` for the PDO connection. You typically don't access them elsewhere.
+</Note>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Links don't work / 404 errors">
+    **Problem:** URLs are incorrect or missing the base path.
+    
+    **Solution:** Check URL configuration:
+    ```php
+    // Debug: Add to config.php temporarily
+    echo "URL: " . URL . "<br>";
+    echo "URL_SUB_FOLDER: " . URL_SUB_FOLDER . "<br>";
+    exit();
+    ```
+    
+    Verify `.htaccess` is present in the public folder.
+  </Accordion>
+  
+  <Accordion title="Database connection fails">
+    **Problem:** Cannot connect to database.
+    
+    **Solution:** Verify credentials:
+    ```php
+    // Test connection in config.php
+    try {
+        $test = new PDO(
+            DB_TYPE . ':host=' . DB_HOST . ';dbname=' . DB_NAME,
+            DB_USER,
+            DB_PASS
+        );
+        echo "Database connection successful!";
+    } catch (PDOException $e) {
+        echo "Connection failed: " . $e->getMessage();
+    }
+    exit();
+    ```
+  </Accordion>
+  
+  <Accordion title="Errors not showing in development">
+    **Problem:** Error reporting not working.
+    
+    **Solution:** Check php.ini settings:
+    ```php
+    // Force error display
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Setup" icon="database" href="/guides/database">
+    Learn how to set up and use the database
+  </Card>
+  
+  <Card title="CRUD Operations" icon="code" href="/guides/crud-operations">
+    Implement Create, Read, Update, Delete functionality
+  </Card>
+</CardGroup>

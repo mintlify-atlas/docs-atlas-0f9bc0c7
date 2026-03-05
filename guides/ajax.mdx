@@ -1,0 +1,594 @@
+---
+title: AJAX Integration
+description: Learn how to add dynamic AJAX functionality to your MINI PHP application
+---
+
+MINI supports AJAX out of the box, allowing you to create dynamic, responsive applications without full page reloads. This guide covers AJAX integration using the built-in example.
+
+## How AJAX Works in MINI
+
+MINI uses a simple pattern for AJAX:
+
+1. **JavaScript** sends an AJAX request to a controller method
+2. **Controller** processes the request and returns data
+3. **JavaScript** receives the response and updates the page
+
+<Note>
+  MINI includes jQuery by default, making AJAX requests simple and cross-browser compatible.
+</Note>
+
+## Complete AJAX Example
+
+The Songs controller includes a working AJAX example that fetches song statistics.
+
+### Step 1: Create the AJAX Controller Method
+
+```php application/controller/songs.php
+public function ajaxGetStats()
+{
+    // Get data from model
+    $amount_of_songs = $this->model->getAmountOfSongs();
+    
+    // Echo data (can be plain text, HTML, or JSON)
+    echo $amount_of_songs;
+}
+```
+
+<Accordion title="Model method used">
+  ```php application/model/model.php
+  public function getAmountOfSongs()
+  {
+      $sql = "SELECT COUNT(id) AS amount_of_songs FROM song";
+      $query = $this->db->prepare($sql);
+      $query->execute();
+      
+      return $query->fetch()->amount_of_songs;
+  }
+  ```
+</Accordion>
+
+### Step 2: Add HTML Trigger Element
+
+```php application/view/songs/index.php
+<h3>Amount of songs (via AJAX)</h3>
+<div>
+    <button id="javascript-ajax-button">
+        Click here to get the amount of songs via Ajax
+    </button>
+    <div id="javascript-ajax-result-box"></div>
+</div>
+```
+
+### Step 3: Write the JavaScript
+
+```javascript public/js/application.js
+$(function() {
+    // Check if button exists
+    if ($('#javascript-ajax-button').length !== 0) {
+        
+        $('#javascript-ajax-button').on('click', function() {
+            
+            // Send AJAX request
+            // "url" is defined in views/_templates/footer.php
+            $.ajax(url + "/songs/ajaxGetStats")
+                .done(function(result) {
+                    // Success - display result
+                    $('#javascript-ajax-result-box').html(result);
+                })
+                .fail(function() {
+                    // Error handling
+                    $('#javascript-ajax-result-box').html('Error loading data');
+                })
+                .always(function() {
+                    // Always executed (cleanup, etc.)
+                });
+        });
+    }
+});
+```
+
+## AJAX URL Structure
+
+MINI's routing works the same for AJAX as regular requests:
+
+```
+AJAX URL: /songs/ajaxGetStats
+→ Controller: Songs
+→ Method: ajaxGetStats()
+
+AJAX URL: /songs/getSong/5
+→ Controller: Songs
+→ Method: getSong($song_id)
+→ Parameter: $song_id = 5
+```
+
+<Note>
+  The `url` variable used in JavaScript is defined in `application/view/_templates/footer.php` and contains your application's base URL.
+</Note>
+
+## Returning JSON Data
+
+For complex data structures, return JSON instead of plain text:
+
+<Steps>
+  <Step title="Create controller method that returns JSON">
+    ```php application/controller/songs.php
+    public function ajaxGetSongData($song_id)
+    {
+        // Get song from model
+        $song = $this->model->getSong($song_id);
+        
+        // Set JSON header
+        header('Content-Type: application/json');
+        
+        // Return JSON
+        echo json_encode($song);
+    }
+    ```
+  </Step>
+  
+  <Step title="Handle JSON in JavaScript">
+    ```javascript
+    $.ajax({
+        url: url + "/songs/ajaxGetSongData/5",
+        dataType: 'json'
+    })
+    .done(function(data) {
+        // data is automatically parsed as JavaScript object
+        console.log(data.artist);
+        console.log(data.track);
+        
+        $('#result').html(
+            '<p>Artist: ' + data.artist + '</p>' +
+            '<p>Track: ' + data.track + '</p>'
+        );
+    });
+    ```
+  </Step>
+</Steps>
+
+### Complex JSON Responses
+
+```php application/controller/songs.php
+public function ajaxGetAllSongs()
+{
+    $songs = $this->model->getAllSongs();
+    
+    // Create response object
+    $response = array(
+        'status' => 'success',
+        'count' => count($songs),
+        'data' => $songs
+    );
+    
+    header('Content-Type: application/json');
+    echo json_encode($response);
+}
+```
+
+```javascript
+$.ajax(url + "/songs/ajaxGetAllSongs")
+    .done(function(response) {
+        if (response.status === 'success') {
+            console.log('Found ' + response.count + ' songs');
+            
+            response.data.forEach(function(song) {
+                console.log(song.artist + ' - ' + song.track);
+            });
+        }
+    });
+```
+
+## POST Requests with AJAX
+
+Send data to the server using POST:
+
+<Tabs>
+  <Tab title="HTML Form">
+    ```html
+    <form id="ajax-add-song-form">
+        <input type="text" id="artist" name="artist" required />
+        <input type="text" id="track" name="track" required />
+        <button type="submit">Add Song</button>
+    </form>
+    <div id="result"></div>
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    $('#ajax-add-song-form').on('submit', function(e) {
+        e.preventDefault(); // Prevent normal form submission
+        
+        $.ajax({
+            url: url + "/songs/ajaxAddSong",
+            type: 'POST',
+            data: {
+                artist: $('#artist').val(),
+                track: $('#track').val()
+            },
+            dataType: 'json'
+        })
+        .done(function(response) {
+            $('#result').html(response.message);
+            // Clear form
+            $('#ajax-add-song-form')[0].reset();
+        })
+        .fail(function() {
+            $('#result').html('Error adding song');
+        });
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Controller">
+    ```php application/controller/songs.php
+    public function ajaxAddSong()
+    {
+        header('Content-Type: application/json');
+        
+        if (isset($_POST['artist']) && isset($_POST['track'])) {
+            // Add to database
+            $this->model->addSong(
+                $_POST['artist'],
+                $_POST['track'],
+                ''
+            );
+            
+            echo json_encode(array(
+                'status' => 'success',
+                'message' => 'Song added successfully!'
+            ));
+        } else {
+            echo json_encode(array(
+                'status' => 'error',
+                'message' => 'Missing required fields'
+            ));
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Error Handling
+
+### Client-Side Error Handling
+
+```javascript
+$.ajax(url + "/songs/ajaxGetStats")
+    .done(function(result) {
+        // Success
+        $('#result').html(result);
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        // HTTP error (404, 500, etc.)
+        console.error('AJAX Error:', textStatus, errorThrown);
+        $('#result').html('Error: Unable to load data');
+    })
+    .always(function() {
+        // Always runs (hide loading spinner, etc.)
+        $('#loading').hide();
+    });
+```
+
+### Server-Side Error Handling
+
+```php application/controller/songs.php
+public function ajaxGetSong($song_id)
+{
+    header('Content-Type: application/json');
+    
+    try {
+        $song = $this->model->getSong($song_id);
+        
+        if ($song) {
+            echo json_encode(array(
+                'status' => 'success',
+                'data' => $song
+            ));
+        } else {
+            // Not found
+            http_response_code(404);
+            echo json_encode(array(
+                'status' => 'error',
+                'message' => 'Song not found'
+            ));
+        }
+    } catch (Exception $e) {
+        // Server error
+        http_response_code(500);
+        echo json_encode(array(
+            'status' => 'error',
+            'message' => 'Server error'
+        ));
+    }
+}
+```
+
+## Loading Indicators
+
+Provide visual feedback during AJAX requests:
+
+```javascript
+$('#load-data-btn').on('click', function() {
+    var $button = $(this);
+    var $result = $('#result');
+    
+    // Show loading state
+    $button.prop('disabled', true).text('Loading...');
+    $result.html('<p>Loading data...</p>');
+    
+    $.ajax(url + "/songs/ajaxGetStats")
+        .done(function(result) {
+            $result.html('<p>Total songs: ' + result + '</p>');
+        })
+        .fail(function() {
+            $result.html('<p>Error loading data</p>');
+        })
+        .always(function() {
+            // Reset button
+            $button.prop('disabled', false).text('Load Data');
+        });
+});
+```
+
+## Real-Time Form Validation
+
+Validate form fields as users type:
+
+<Tabs>
+  <Tab title="HTML">
+    ```html
+    <input type="text" id="username" name="username" />
+    <span id="username-validation"></span>
+    ```
+  </Tab>
+  
+  <Tab title="JavaScript">
+    ```javascript
+    $('#username').on('blur', function() {
+        var username = $(this).val();
+        
+        if (username.length > 0) {
+            $.ajax({
+                url: url + "/users/checkUsername",
+                type: 'POST',
+                data: { username: username },
+                dataType: 'json'
+            })
+            .done(function(response) {
+                if (response.available) {
+                    $('#username-validation').html('✓ Available').css('color', 'green');
+                } else {
+                    $('#username-validation').html('✗ Taken').css('color', 'red');
+                }
+            });
+        }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Controller">
+    ```php
+    public function checkUsername()
+    {
+        header('Content-Type: application/json');
+        
+        $username = $_POST['username'] ?? '';
+        $exists = $this->model->usernameExists($username);
+        
+        echo json_encode(array(
+            'available' => !$exists
+        ));
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Auto-Refresh Data
+
+Automatically update data at intervals:
+
+```javascript
+// Update every 5 seconds
+setInterval(function() {
+    $.ajax(url + "/songs/ajaxGetStats")
+        .done(function(result) {
+            $('#live-count').text(result);
+        });
+}, 5000);
+```
+
+<Warning>
+  Be careful with auto-refresh intervals. Too frequent requests can overload your server. Consider using WebSockets for real-time updates instead.
+</Warning>
+
+## Common AJAX Patterns
+
+### Delete with Confirmation
+
+```javascript
+$('.delete-song').on('click', function(e) {
+    e.preventDefault();
+    
+    if (confirm('Are you sure you want to delete this song?')) {
+        var songId = $(this).data('song-id');
+        var $row = $(this).closest('tr');
+        
+        $.ajax({
+            url: url + "/songs/ajaxDeleteSong/" + songId,
+            type: 'POST',
+            dataType: 'json'
+        })
+        .done(function(response) {
+            if (response.status === 'success') {
+                // Remove row with animation
+                $row.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }
+        });
+    }
+});
+```
+
+### Inline Editing
+
+```javascript
+$('.editable').on('dblclick', function() {
+    var $cell = $(this);
+    var originalValue = $cell.text();
+    var songId = $cell.data('song-id');
+    var field = $cell.data('field');
+    
+    // Replace text with input
+    var $input = $('<input type="text" />').val(originalValue);
+    $cell.html($input);
+    $input.focus();
+    
+    $input.on('blur', function() {
+        var newValue = $(this).val();
+        
+        if (newValue !== originalValue) {
+            // Save via AJAX
+            $.ajax({
+                url: url + "/songs/ajaxUpdateField",
+                type: 'POST',
+                data: {
+                    song_id: songId,
+                    field: field,
+                    value: newValue
+                },
+                dataType: 'json'
+            })
+            .done(function(response) {
+                if (response.status === 'success') {
+                    $cell.text(newValue);
+                } else {
+                    $cell.text(originalValue);
+                }
+            });
+        } else {
+            $cell.text(originalValue);
+        }
+    });
+});
+```
+
+### Search with Autocomplete
+
+```javascript
+$('#search').on('keyup', function() {
+    var searchTerm = $(this).val();
+    
+    if (searchTerm.length >= 3) {
+        $.ajax({
+            url: url + "/songs/ajaxSearch",
+            type: 'POST',
+            data: { term: searchTerm },
+            dataType: 'json'
+        })
+        .done(function(response) {
+            var html = '';
+            response.data.forEach(function(song) {
+                html += '<div class="result-item">' +
+                       song.artist + ' - ' + song.track +
+                       '</div>';
+            });
+            $('#search-results').html(html);
+        });
+    } else {
+        $('#search-results').empty();
+    }
+});
+```
+
+## Security Considerations
+
+<AccordionGroup>
+  <Accordion title="Validate all input">
+    Always validate and sanitize data on the server, even for AJAX requests:
+    
+    ```php
+    public function ajaxAddSong()
+    {
+        $artist = trim($_POST['artist'] ?? '');
+        $track = trim($_POST['track'] ?? '');
+        
+        if (empty($artist) || empty($track)) {
+            echo json_encode(['status' => 'error', 'message' => 'Invalid input']);
+            return;
+        }
+        
+        $this->model->addSong($artist, $track, '');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Use CSRF tokens">
+    For state-changing AJAX requests (POST, DELETE, etc.), include CSRF tokens to prevent cross-site request forgery.
+  </Accordion>
+  
+  <Accordion title="Escape output">
+    When inserting AJAX responses into the DOM, escape HTML to prevent XSS:
+    
+    ```javascript
+    // ✅ Safe - jQuery automatically escapes
+    $('#result').text(response.user_input);
+    
+    // ⚠️ Potentially unsafe if response contains user input
+    $('#result').html(response.html);
+    ```
+  </Accordion>
+  
+  <Accordion title="Rate limiting">
+    Implement rate limiting for AJAX endpoints to prevent abuse:
+    
+    ```php
+    // Check request frequency
+    if ($this->isRateLimited()) {
+        http_response_code(429);
+        echo json_encode(['status' => 'error', 'message' => 'Too many requests']);
+        return;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debugging AJAX
+
+### Browser Developer Tools
+
+1. Open Network tab in browser DevTools
+2. Filter by "XHR" to see AJAX requests
+3. Click on a request to see:
+   - Request URL
+   - Request/Response headers
+   - Request payload
+   - Response data
+
+### Console Logging
+
+```javascript
+$.ajax(url + "/songs/ajaxGetStats")
+    .done(function(result) {
+        console.log('Success:', result);
+        $('#result').html(result);
+    })
+    .fail(function(jqXHR, textStatus, errorThrown) {
+        console.error('Error:', textStatus, errorThrown);
+        console.error('Response:', jqXHR.responseText);
+    });
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CRUD Operations" icon="database" href="/guides/crud-operations">
+    Learn how to implement Create, Read, Update, Delete operations
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure your MINI application settings
+  </Card>
+</CardGroup>

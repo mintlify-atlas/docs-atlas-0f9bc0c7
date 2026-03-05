@@ -1,0 +1,467 @@
+---
+title: "Model Class"
+description: "Database model class with CRUD operations"
+---
+
+## Overview
+
+The `Model` class handles all database operations in MINI. It uses PDO for secure database access with prepared statements.
+
+Located at: `application/model/model.php`
+
+<Note>
+  In MINI, all database methods are in a single `Model` class for simplicity. In larger applications, you might create separate model classes for different entities.
+</Note>
+
+## Class Definition
+
+```php model.php
+class Model
+{
+    /**
+     * @param object $db A PDO database connection
+     */
+    function __construct($db)
+    {
+        try {
+            $this->db = $db;
+        } catch (PDOException $e) {
+            exit('Database connection could not be established.');
+        }
+    }
+}
+```
+
+## Constructor
+
+### `__construct($db)`
+
+Initializes the model with a PDO database connection.
+
+<ParamField path="db" type="PDO" required>
+  A PDO database connection object, passed from the Controller.
+</ParamField>
+
+**Example:**
+
+```php
+// In Controller class:
+$this->model = new Model($this->db);
+```
+
+## Read Operations
+
+### `getAllSongs()`
+
+Retrieve all songs from the database.
+
+```php
+public function getAllSongs()
+{
+    $sql = "SELECT id, artist, track, link FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+
+    // fetchAll() is the PDO method that gets all result rows
+    return $query->fetchAll();
+}
+```
+
+<ResponseField name="return" type="array">
+  Array of song objects. Each object has properties: `id`, `artist`, `track`, `link`.
+</ResponseField>
+
+**Usage:**
+
+```php
+// In controller:
+$songs = $this->model->getAllSongs();
+
+// In view:
+foreach ($songs as $song) {
+    echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8');
+    echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8');
+}
+```
+
+### `getSong($song_id)`
+
+Get a single song by ID.
+
+```php
+public function getSong($song_id)
+{
+    $sql = "SELECT id, artist, track, link FROM song WHERE id = :song_id LIMIT 1";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+
+    $query->execute($parameters);
+
+    // fetch() is the PDO method that gets exactly one result
+    return $query->fetch();
+}
+```
+
+<ParamField path="song_id" type="int" required>
+  The ID of the song to retrieve.
+</ParamField>
+
+<ResponseField name="return" type="object|false">
+  Song object with properties: `id`, `artist`, `track`, `link`. Returns `false` if not found.
+</ResponseField>
+
+**Usage:**
+
+```php
+// In controller:
+$song = $this->model->getSong(17);
+
+if ($song) {
+    echo $song->artist; // Access as object property
+}
+```
+
+### `getAmountOfSongs()`
+
+Get the total count of songs.
+
+```php
+public function getAmountOfSongs()
+{
+    $sql = "SELECT COUNT(id) AS amount_of_songs FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+
+    // fetch() gets exactly one result
+    return $query->fetch()->amount_of_songs;
+}
+```
+
+<ResponseField name="return" type="int">
+  Total number of songs in the database.
+</ResponseField>
+
+## Create Operations
+
+### `addSong($artist, $track, $link)`
+
+Insert a new song into the database.
+
+```php
+public function addSong($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':artist' => $artist, ':track' => $track, ':link' => $link);
+
+    $query->execute($parameters);
+}
+```
+
+<ParamField path="artist" type="string" required>
+  The artist name.
+</ParamField>
+
+<ParamField path="track" type="string" required>
+  The track/song name.
+</ParamField>
+
+<ParamField path="link" type="string" required>
+  A link to the song (YouTube, Spotify, etc.).
+</ParamField>
+
+<Note>
+  PDO automatically escapes all input, protecting against SQL injection. You don't need to manually sanitize parameters.
+</Note>
+
+**Usage:**
+
+```php
+// In controller:
+if (isset($_POST['submit_add_song'])) {
+    $this->model->addSong(
+        $_POST['artist'],
+        $_POST['track'],
+        $_POST['link']
+    );
+    
+    header('location: ' . URL . 'songs');
+}
+```
+
+## Update Operations
+
+### `updateSong($artist, $track, $link, $song_id)`
+
+Update an existing song.
+
+```php
+public function updateSong($artist, $track, $link, $song_id)
+{
+    $sql = "UPDATE song SET artist = :artist, track = :track, link = :link WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(
+        ':artist' => $artist, 
+        ':track' => $track, 
+        ':link' => $link, 
+        ':song_id' => $song_id
+    );
+
+    $query->execute($parameters);
+}
+```
+
+<ParamField path="artist" type="string" required>
+  The updated artist name.
+</ParamField>
+
+<ParamField path="track" type="string" required>
+  The updated track name.
+</ParamField>
+
+<ParamField path="link" type="string" required>
+  The updated link.
+</ParamField>
+
+<ParamField path="song_id" type="int" required>
+  The ID of the song to update.
+</ParamField>
+
+**Usage:**
+
+```php
+// In controller:
+if (isset($_POST['submit_update_song'])) {
+    $this->model->updateSong(
+        $_POST['artist'],
+        $_POST['track'],
+        $_POST['link'],
+        $_POST['song_id']
+    );
+    
+    header('location: ' . URL . 'songs');
+}
+```
+
+## Delete Operations
+
+### `deleteSong($song_id)`
+
+Delete a song from the database.
+
+```php
+public function deleteSong($song_id)
+{
+    $sql = "DELETE FROM song WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+
+    $query->execute($parameters);
+}
+```
+
+<ParamField path="song_id" type="int" required>
+  The ID of the song to delete.
+</ParamField>
+
+<Warning>
+  This is a permanent deletion. In production applications, consider soft deletes or adding confirmation dialogs.
+</Warning>
+
+**Usage:**
+
+```php
+// In controller:
+public function delete($song_id)
+{
+    // In a real app, add authentication and authorization checks
+    $this->model->deleteSong($song_id);
+    
+    header('location: ' . URL . 'songs');
+}
+```
+
+## Debugging Queries
+
+MINI includes a helper function to debug PDO queries:
+
+```php
+$sql = "SELECT id, artist, track FROM song WHERE id = :song_id LIMIT 1";
+$query = $this->db->prepare($sql);
+$parameters = array(':song_id' => $song_id);
+
+// Debug: see the actual SQL that will be executed
+echo Helper::debugPDO($sql, $parameters);
+// Output: SELECT id, artist, track FROM song WHERE id = '5' LIMIT 1
+
+$query->execute($parameters);
+```
+
+<Tip>
+  Use `Helper::debugPDO()` during development to see the exact SQL query with parameters substituted. Remove these calls in production.
+</Tip>
+
+## Creating Custom Model Methods
+
+You can add your own methods to the Model class:
+
+```php
+// Search songs by artist
+public function searchSongsByArtist($search_term)
+{
+    $sql = "SELECT id, artist, track, link FROM song WHERE artist LIKE :search";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':search' => '%' . $search_term . '%');
+    
+    $query->execute($parameters);
+    return $query->fetchAll();
+}
+
+// Get songs with pagination
+public function getSongsPaginated($offset, $limit)
+{
+    $sql = "SELECT id, artist, track, link FROM song LIMIT :offset, :limit";
+    $query = $this->db->prepare($sql);
+    
+    // Bind parameters with explicit types for LIMIT clause
+    $query->bindValue(':offset', (int)$offset, PDO::PARAM_INT);
+    $query->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    
+    $query->execute();
+    return $query->fetchAll();
+}
+
+// Get songs ordered by date
+public function getRecentSongs($limit = 10)
+{
+    $sql = "SELECT id, artist, track, link FROM song ORDER BY id DESC LIMIT :limit";
+    $query = $this->db->prepare($sql);
+    $query->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+    
+    $query->execute();
+    return $query->fetchAll();
+}
+```
+
+## PDO Best Practices
+
+<Accordion title="Always Use Prepared Statements">
+  Never concatenate user input directly into SQL queries:
+  
+  ```php
+  // NEVER DO THIS (SQL Injection vulnerability):
+  $sql = "SELECT * FROM song WHERE id = " . $_GET['id'];
+  $query = $this->db->query($sql);
+  
+  // ALWAYS DO THIS:
+  $sql = "SELECT * FROM song WHERE id = :id";
+  $query = $this->db->prepare($sql);
+  $query->execute([':id' => $_GET['id']]);
+  ```
+</Accordion>
+
+<Accordion title="Use Named Placeholders">
+  Named placeholders (`:name`) are more readable than positional placeholders (`?`):
+  
+  ```php
+  // Named (recommended):
+  $parameters = array(':artist' => $artist, ':track' => $track);
+  
+  // Positional (less clear):
+  $parameters = array($artist, $track);
+  ```
+</Accordion>
+
+<Accordion title="Handle Fetch Results Properly">
+  ```php
+  // fetchAll() returns an array (even if empty)
+  $songs = $query->fetchAll();
+  if (count($songs) > 0) { /* ... */ }
+  
+  // fetch() returns object or FALSE
+  $song = $query->fetch();
+  if ($song) { /* ... */ }
+  ```
+</Accordion>
+
+<Accordion title="Don't Sanitize Input, Escape Output">
+  PDO handles input escaping automatically. Your job is to escape output in views:
+  
+  ```php
+  // In model: Store raw input (PDO handles escaping)
+  $this->model->addSong($_POST['artist'], $_POST['track'], $_POST['link']);
+  
+  // In view: Escape output to prevent XSS
+  echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8');
+  ```
+</Accordion>
+
+## Advanced Patterns
+
+### Transactions
+
+```php
+public function transferData($from_id, $to_id, $amount)
+{
+    try {
+        $this->db->beginTransaction();
+        
+        // Multiple queries
+        $this->deductFromAccount($from_id, $amount);
+        $this->addToAccount($to_id, $amount);
+        
+        $this->db->commit();
+    } catch (Exception $e) {
+        $this->db->rollBack();
+        throw $e;
+    }
+}
+```
+
+### Joins
+
+```php
+public function getSongsWithAlbums()
+{
+    $sql = "SELECT s.id, s.artist, s.track, a.album_name 
+            FROM song s 
+            LEFT JOIN album a ON s.album_id = a.id";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    return $query->fetchAll();
+}
+```
+
+### Last Insert ID
+
+```php
+public function addSongAndGetId($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':artist' => $artist, ':track' => $track, ':link' => $link);
+    
+    $query->execute($parameters);
+    
+    // Get the auto-increment ID
+    return $this->db->lastInsertId();
+}
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Controller Class" icon="code" href="/api/controller">
+    Learn how controllers use models
+  </Card>
+  <Card title="Database Guide" icon="server" href="/guides/database">
+    Complete database usage guide
+  </Card>
+  <Card title="CRUD Operations" icon="list-check" href="/guides/crud-operations">
+    Step-by-step CRUD tutorial
+  </Card>
+  <Card title="Helper Functions" icon="wrench" href="/api/helper">
+    PDO debugging utilities
+  </Card>
+</CardGroup>

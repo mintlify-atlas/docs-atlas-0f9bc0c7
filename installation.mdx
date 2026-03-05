@@ -1,0 +1,430 @@
+---
+title: Installation
+description: Complete guide to installing MINI PHP framework
+---
+
+## Requirements
+
+Before installing MINI, ensure your environment meets these requirements:
+
+<CardGroup cols={2}>
+  <Card title="PHP" icon="php">
+    PHP 5.3.0 or higher (tested with PHP 5.6, 7.x, and 8.0)
+  </Card>
+  
+  <Card title="MySQL" icon="database">
+    MySQL or MariaDB database server
+  </Card>
+  
+  <Card title="Apache mod_rewrite" icon="server">
+    Apache with mod_rewrite enabled for clean URLs
+  </Card>
+  
+  <Card title="Composer" icon="box">
+    Optional: Composer for dependency management
+  </Card>
+</CardGroup>
+
+<Note>
+  If you cannot enable mod_rewrite, check out [TINY](https://github.com/panique/tiny), a version of MINI that works without mod_rewrite.
+</Note>
+
+## Installation Methods
+
+Choose the installation method that best fits your needs:
+
+<Tabs>
+  <Tab title="Manual Installation">
+    ### Manual Installation
+
+    The standard way to install MINI on any system.
+
+    <Steps>
+      <Step title="Clone or Download MINI">
+        Clone the repository or download the ZIP file:
+
+        ```bash
+        git clone https://github.com/panique/mini.git
+        cd mini
+        ```
+
+        Or download and extract the ZIP file from GitHub.
+      </Step>
+
+      <Step title="Configure Database">
+        Edit the database credentials in `application/config/config.php`:
+
+        ```php application/config/config.php
+        define('DB_TYPE', 'mysql');
+        define('DB_HOST', '127.0.0.1');
+        define('DB_NAME', 'mini');
+        define('DB_USER', 'root');
+        define('DB_PASS', 'your_password');
+        define('DB_CHARSET', 'utf8');
+        ```
+
+        <Warning>
+          Never commit database credentials to version control. Consider using environment variables for production.
+        </Warning>
+      </Step>
+
+      <Step title="Create Database">
+        Create the database and import the SQL file:
+
+        ```bash
+        mysql -u root -p
+        ```
+
+        ```sql
+        CREATE DATABASE mini;
+        USE mini;
+        source _install/01-create-database.sql;
+        ```
+
+        Or use PHPMyAdmin to import the `.sql` file from the `_install/` folder.
+      </Step>
+
+      <Step title="Enable mod_rewrite">
+        Ensure Apache's mod_rewrite module is enabled:
+
+        **Ubuntu/Debian:**
+        ```bash
+        sudo a2enmod rewrite
+        sudo service apache2 restart
+        ```
+
+        **Check if enabled:**
+        ```bash
+        apache2ctl -M | grep rewrite
+        ```
+
+        You should see: `rewrite_module (shared)`
+      </Step>
+
+      <Step title="Configure Apache">
+        Make sure your Apache configuration allows `.htaccess` overrides:
+
+        ```apache
+        <Directory /var/www/html>
+            AllowOverride All
+        </Directory>
+        ```
+
+        Restart Apache after changes:
+        ```bash
+        sudo service apache2 restart
+        ```
+      </Step>
+
+      <Step title="Set Permissions">
+        Ensure proper permissions for the web server:
+
+        ```bash
+        sudo chown -R www-data:www-data /path/to/mini
+        sudo chmod -R 755 /path/to/mini
+        ```
+      </Step>
+
+      <Step title="Verify Installation">
+        Open your browser and navigate to:
+        ```
+        http://localhost/mini
+        ```
+
+        You should see the MINI welcome page with example links.
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Vagrant (Automatic)">
+    ### Vagrant Installation (100% Automatic)
+
+    The easiest way to get MINI running with a fully configured development environment.
+
+    <Steps>
+      <Step title="Install Prerequisites">
+        Install VirtualBox and Vagrant:
+
+        - [Download VirtualBox](https://www.virtualbox.org/)
+        - [Download Vagrant](https://www.vagrantup.com/)
+      </Step>
+
+      <Step title="Setup Vagrant Files">
+        Create a new directory and copy Vagrant files:
+
+        ```bash
+        mkdir mini-vagrant
+        cd mini-vagrant
+        cp /path/to/mini/_vagrant/Vagrantfile .
+        cp /path/to/mini/_vagrant/bootstrap.sh .
+        ```
+      </Step>
+
+      <Step title="Add Ubuntu Box">
+        Add Ubuntu 20.04 LTS to Vagrant (if not already added):
+
+        ```bash
+        vagrant box add ubuntu/focal64
+        ```
+      </Step>
+
+      <Step title="Start Vagrant">
+        Launch the Vagrant box (this takes 5-10 minutes):
+
+        ```bash
+        vagrant up
+        ```
+
+        This automatically installs:
+        - Apache web server
+        - PHP 7.4
+        - MySQL
+        - PHPMyAdmin
+        - Git and Composer
+        - MINI application with demo data
+        - All necessary configurations
+      </Step>
+
+      <Step title="Access Your Application">
+        Once installation completes, access MINI at:
+
+        ```
+        http://192.168.33.44
+        ```
+
+        **Default Credentials:**
+        - MySQL root password: `12345678`
+        - PHPMyAdmin password: `12345678`
+        - Project location: `/var/www/html/myproject`
+
+        <Note>
+          You can change the IP address in `Vagrantfile` and credentials in `bootstrap.sh`.
+        </Note>
+      </Step>
+
+      <Step title="Manage Vagrant Box">
+        Useful Vagrant commands:
+
+        ```bash
+        # Stop the box
+        vagrant halt
+
+        # Start the box
+        vagrant up
+
+        # SSH into the box
+        vagrant ssh
+
+        # Destroy the box
+        vagrant destroy
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="Ubuntu Auto-Install">
+    ### Ubuntu Auto-Install Script
+
+    Install MINI in 30 seconds on Ubuntu 14.04 LTS or newer.
+
+    <Warning>
+      This method is for development environments only. Do not use on production servers without reviewing the script.
+    </Warning>
+
+    <Steps>
+      <Step title="Download Install Script">
+        Download and run the auto-install script:
+
+        ```bash
+        wget http://www.dev-metal.com/mini-install.sh
+        chmod +x mini-install.sh
+        ```
+      </Step>
+
+      <Step title="Run Installation">
+        Execute the script with sudo:
+
+        ```bash
+        sudo ./mini-install.sh
+        ```
+
+        The script automatically:
+        - Installs Apache, PHP, MySQL, PHPMyAdmin
+        - Enables mod_rewrite
+        - Configures Apache
+        - Downloads MINI
+        - Sets up the database
+        - Configures passwords
+      </Step>
+
+      <Step title="Access Your Application">
+        After installation completes, open:
+
+        ```
+        http://localhost/mini
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      For more details, see: [Install MINI in 30 seconds inside Ubuntu 14.04 LTS](http://www.dev-metal.com/install-mini-30-seconds-inside-ubuntu-14-04-lts/)
+    </Note>
+  </Tab>
+</Tabs>
+
+## Server-Specific Configuration
+
+### nginx Configuration
+
+If you're using nginx instead of Apache:
+
+```nginx nginx.conf
+server {
+    server_name default_server _;   # Listen to any servername
+    listen      [::]:80;
+    listen      80;
+
+    root /var/www/html/myproject/public;
+
+    location / {
+        index index.php;
+        try_files /$uri /$uri/ /index.php?url=$uri;
+    }
+
+    location ~ \.(php)$ {
+        fastcgi_pass   unix:/var/run/php5-fpm.sock;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+```
+
+<Note>
+  For detailed nginx setup discussion, see [this GitHub issue](https://github.com/panique/mini/issues/55).
+</Note>
+
+### Enabling mod_rewrite on Different Platforms
+
+<AccordionGroup>
+  <Accordion title="Ubuntu 14.04/20.04 LTS">
+    ```bash
+    sudo a2enmod rewrite
+    sudo service apache2 restart
+    ```
+
+    Guide: [Enable mod_rewrite on Ubuntu](http://www.dev-metal.com/enable-mod_rewrite-ubuntu-14-04-lts/)
+  </Accordion>
+
+  <Accordion title="XAMPP (Windows)">
+    1. Open `httpd.conf` in the Apache config folder
+    2. Find the line: `#LoadModule rewrite_module modules/mod_rewrite.so`
+    3. Remove the `#` to uncomment it
+    4. Restart Apache
+
+    Guide: [Enable mod_rewrite in XAMPP](http://www.leonardaustin.com/blog/technical/enable-mod_rewrite-in-xampp/)
+  </Accordion>
+
+  <Accordion title="MAMP (Mac OS)">
+    1. Open MAMP preferences
+    2. Go to Apache settings
+    3. Enable mod_rewrite
+    4. Restart servers
+
+    Guide: [Get .htaccess to work on MAMP](http://stackoverflow.com/questions/7670561/how-to-get-htaccess-to-work-on-mamp)
+  </Accordion>
+
+  <Accordion title="EasyPHP (Windows)">
+    Guide: [EasyPHP and .htaccess](http://stackoverflow.com/questions/8158770/easyphp-and-htaccess)
+  </Accordion>
+
+  <Accordion title="AMPPS (Windows/Mac)">
+    Guide: [AMPPS rewrite enable option](http://www.softaculous.com/board/index.php?tid=3634&title=AMPPS_rewrite_enable/disable_option%3F_please%3F)
+  </Accordion>
+</AccordionGroup>
+
+## Verification
+
+Verify your installation is working correctly:
+
+<Steps>
+  <Step title="Check Home Page">
+    Navigate to your MINI installation. You should see the welcome page.
+  </Step>
+
+  <Step title="Test Clean URLs">
+    Try accessing: `http://localhost/mini/home/exampleOne`
+
+    If you see a page without a 404 error, clean URLs are working.
+  </Step>
+
+  <Step title="Test Database">
+    Click on "Songs" in the navigation. If you see the songs list, the database connection is working.
+  </Step>
+
+  <Step title="Test CRUD Operations">
+    Try adding, editing, and deleting a song to verify all CRUD operations work.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="404 errors on all pages except home">
+    **Cause:** mod_rewrite is not enabled or `.htaccess` is not being read.
+
+    **Solution:**
+    1. Verify mod_rewrite is enabled: `apache2ctl -M | grep rewrite`
+    2. Check Apache config allows `.htaccess` overrides: `AllowOverride All`
+    3. Ensure `.htaccess` file exists in the `public/` folder
+    4. Restart Apache
+  </Accordion>
+
+  <Accordion title="Database connection error">
+    **Cause:** Incorrect database credentials or MySQL not running.
+
+    **Solution:**
+    1. Verify MySQL is running: `sudo service mysql status`
+    2. Check credentials in `application/config/config.php`
+    3. Ensure the database exists: `mysql -u root -p -e "SHOW DATABASES;"`
+    4. Verify the user has access to the database
+  </Accordion>
+
+  <Accordion title="Blank white page">
+    **Cause:** PHP error with error reporting disabled.
+
+    **Solution:**
+    1. Enable error reporting in `application/config/config.php`:
+       ```php
+       define('ENVIRONMENT', 'development');
+       ```
+    2. Check PHP error logs: `tail -f /var/log/apache2/error.log`
+    3. Verify PHP version: `php -v` (must be 5.3.0+)
+  </Accordion>
+
+  <Accordion title="Permission denied errors">
+    **Cause:** Incorrect file permissions.
+
+    **Solution:**
+    ```bash
+    sudo chown -R www-data:www-data /path/to/mini
+    sudo chmod -R 755 /path/to/mini
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Sub-folder Installation
+
+MINI works perfectly in a sub-folder without any additional configuration:
+
+```
+http://localhost/myproject/mini
+```
+
+The framework automatically detects the sub-folder and adjusts URLs accordingly.
+
+## Next Steps
+
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Learn how to build your first controller and view
+</Card>

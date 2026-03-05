@@ -1,0 +1,176 @@
+---
+title: System Requirements
+description: Hardware and software requirements for deploying MINI
+---
+
+## Minimum Requirements
+
+MINI is designed to run on minimal infrastructure with basic server requirements.
+
+### PHP Version
+
+<Card title="PHP 5.3.0+" icon="php">
+  MINI was originally built for PHP 5.3.0 but works perfectly with modern PHP versions.
+</Card>
+
+**Supported PHP Versions:**
+- PHP 5.3.0+ (original requirement)
+- PHP 5.6.x (tested, stable)
+- PHP 7.0.x, 7.1.x, 7.2.x, 7.3.x, 7.4.x (tested, stable)
+- PHP 8.0+ (should work, but not extensively tested)
+
+<Note>
+  For PHP 7.0+, the framework uses the class name "Problem" instead of "Error" due to PHP 7's internal Error class. See [troubleshooting](/deployment/troubleshooting#php7-error-class) for details.
+</Note>
+
+### Database
+
+- **MySQL 5.x or higher** (required)
+- PDO MySQL extension enabled
+- Database with proper character encoding support (UTF-8 recommended)
+
+<Info>
+  The framework uses PDO for database operations, providing protection against SQL injection when used correctly.
+</Info>
+
+### Web Server
+
+#### Apache
+
+- **Apache 2.2 or 2.4**
+- **mod_rewrite module** (required for clean URLs)
+- `.htaccess` support enabled (`AllowOverride All`)
+
+<Warning>
+  Without mod_rewrite, the application will not work. If you need a non-mod_rewrite solution, check out [TINY](https://github.com/panique/tiny), MINI's smaller brother.
+</Warning>
+
+#### nginx
+
+nginx is supported with proper configuration. See [Server Setup](/deployment/server-setup#nginx-configuration) for details.
+
+### PHP Extensions
+
+Required extensions:
+- `pdo`
+- `pdo_mysql`
+- `mod_rewrite` (Apache only)
+
+### Optional Tools
+
+<AccordionGroup>
+  <Accordion title="Composer" icon="box">
+    Not required by default. The framework runs without Composer dependencies. However, if you plan to extend the application with additional packages, Composer can be useful.
+  </Accordion>
+
+  <Accordion title="Git" icon="git">
+    Recommended for version control and easy updates. The Vagrant setup automatically installs Git.
+  </Accordion>
+
+  <Accordion title="PHPMyAdmin" icon="database">
+    Optional but helpful for database management. Included in the Vagrant setup.
+  </Accordion>
+</AccordionGroup>
+
+## Server Recommendations
+
+### Production Environment
+
+<CardGroup cols={2}>
+  <Card title="Minimum Specs" icon="server">
+    - 512 MB RAM
+    - 1 CPU core
+    - 500 MB disk space
+  </Card>
+
+  <Card title="Recommended Specs" icon="server">
+    - 1 GB+ RAM
+    - 2+ CPU cores
+    - 5 GB+ disk space
+  </Card>
+</CardGroup>
+
+### Development Environment
+
+MINI works seamlessly in common development environments:
+
+- **XAMPP** (Windows, Mac, Linux)
+- **MAMP** (Mac)
+- **WAMP** (Windows)
+- **AMPPS** (Windows, Mac)
+- **EasyPHP** (Windows)
+- **LAMPP** (Linux)
+- **Vagrant** (all platforms) - see [installation guides](/#vagrant-setup)
+
+<Tip>
+  For automated setup, MINI includes a Vagrant configuration that installs everything automatically. See the [Vagrant documentation](https://github.com/panique/mini#installation-in-vagrant-100-automatic).
+</Tip>
+
+## Hosting Compatibility
+
+MINI runs on most shared hosting providers that meet the basic requirements:
+
+✅ **Compatible with:**
+- Most shared hosting (cPanel, Plesk, etc.)
+- VPS and dedicated servers
+- Cloud platforms (DigitalOcean, AWS, Azure, etc.)
+- Docker containers
+- Vagrant environments
+
+❌ **Not compatible with:**
+- Hosting without mod_rewrite support
+- Servers with PHP < 5.3.0
+- Hosting without PDO MySQL support
+
+## Security Considerations
+
+### File System Requirements
+
+<Warning>
+  The web server's document root MUST point to the `/public` folder, not the project root.
+</Warning>
+
+This security measure ensures:
+- Application code is not directly accessible
+- Configuration files are protected
+- `.git` folder cannot be accessed
+- Only public assets are exposed
+
+### File Permissions
+
+Recommended permissions:
+- **Directories**: `755` (read/execute for all, write for owner)
+- **PHP files**: `644` (read for all, write for owner)
+- **Configuration files**: `600` (read/write for owner only)
+
+## Quick Compatibility Check
+
+Use this command to verify your PHP installation:
+
+```bash
+php -v  # Check PHP version
+php -m | grep pdo  # Check PDO extension
+php -m | grep pdo_mysql  # Check PDO MySQL extension
+```
+
+For Apache mod_rewrite:
+
+```bash
+# Ubuntu/Debian
+apache2ctl -M | grep rewrite
+
+# CentOS/RHEL
+httpd -M | grep rewrite
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Server Setup" icon="server" href="/deployment/server-setup">
+    Configure Apache or nginx for MINI
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/deployment/troubleshooting">
+    Fix common deployment issues
+  </Card>
+</CardGroup>

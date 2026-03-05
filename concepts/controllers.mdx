@@ -1,0 +1,612 @@
+---
+title: 'Controllers'
+description: 'Controller layer in MINI: handling requests and coordinating between models and views'
+---
+
+## Overview
+
+**Controllers** are the coordinators in MINIs MVC architecture. They:
+- Receive and process user requests
+- Interact with models to fetch/modify data
+- Load views to display responses
+- Handle form submissions and redirects
+
+Every controller extends the base `Controller` class, which provides database access and model loading.
+
+## Base Controller Class
+
+All controllers inherit from this base class:
+
+```php application/core/controller.php
+class Controller
+{
+    /**
+     * @var null Database Connection
+     */
+    public $db = null;
+    
+    /**
+     * @var null Model
+     */
+    public $model = null;
+    
+    /**
+     * Whenever controller is created, open a database connection
+     * and load "the model".
+     */
+    function __construct()
+    {
+        $this->openDatabaseConnection();
+        $this->loadModel();
+    }
+    
+    /**
+     * Open the database connection with credentials from config.php
+     */
+    private function openDatabaseConnection()
+    {
+        $options = array(
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
+        );
+        
+        $this->db = new PDO(
+            DB_TYPE . ':host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
+            DB_USER,
+            DB_PASS,
+            $options
+        );
+    }
+    
+    /**
+     * Loads the "model".
+     */
+    public function loadModel()
+    {
+        require APP . 'model/model.php';
+        $this->model = new Model($this->db);
+    }
+}
+```
+
+### What This Provides
+
+<AccordionGroup>
+  <Accordion title="$this->db - Direct database access">
+    A PDO database connection configured with:
+    - **Fetch mode**: `PDO::FETCH_OBJ` (results as objects)
+    - **Error mode**: `PDO::ERRMODE_WARNING` (shows SQL errors)
+    
+    Use this for custom queries:
+    ```php
+    $sql = "SELECT * FROM users WHERE active = 1";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    $users = $query->fetchAll();
+    ```
+  </Accordion>
+  
+  <Accordion title="$this->model - Model instance">
+    An instance of the `Model` class with database access:
+    ```php
+    $songs = $this->model->getAllSongs();
+    $this->model->addSong('Artist', 'Track', 'URL');
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Creating a Controller
+
+### Basic Structure
+
+Create a new file in `application/controller/`:
+
+```php application/controller/home.php
+class Home extends Controller
+{
+    /**
+     * PAGE: index
+     * Handles http://yourproject/home/index (default page)
+     */
+    public function index()
+    {
+        // Load views
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    
+    /**
+     * PAGE: exampleone
+     * Handles http://yourproject/home/exampleone
+     */
+    public function exampleOne()
+    {
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/example_one.php';
+        require APP . 'view/_templates/footer.php';
+    }
+}
+```
+
+### Naming Conventions
+
+<Warning>
+  **Critical**: Don't use the same name for class and method. This triggers the class constructor:
+  
+  ```php
+  // WRONG - triggers __construct behavior
+  class Home extends Controller
+  {
+      public function home() { }  // Bad!
+  }
+  
+  // CORRECT
+  class Home extends Controller
+  {
+      public function index() { }  // Good!
+  }
+  ```
+  
+  See [PHP Constructor Documentation](http://php.net/manual/en/language.oop5.decon.php)
+</Warning>
+
+**File and class names:**
+- File: `songs.php` → Class: `Songs`
+- File: `user_admin.php` → Class: `User_admin`
+- Always match the filename (case-insensitive)
+
+## Real-World Controller Examples
+
+### Simple Page Controller
+
+The `Home` controller displays static pages:
+
+```php application/controller/home.php
+class Home extends Controller
+{
+    public function index()
+    {
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    
+    public function exampleOne()
+    {
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/example_one.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    
+    public function exampleTwo()
+    {
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/example_two.php';
+        require APP . 'view/_templates/footer.php';
+    }
+}
+```
+
+### CRUD Controller
+
+The `Songs` controller demonstrates full CRUD operations:
+
+```php application/controller/songs.php
+class Songs extends Controller
+{
+    /**
+     * PAGE: index
+     * URL: /songs or /songs/index
+     * Display all songs
+     */
+    public function index()
+    {
+        // Fetch data from model
+        $songs = $this->model->getAllSongs();
+        $amount_of_songs = $this->model->getAmountOfSongs();
+        
+        // Variables are now available in views
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/songs/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    
+    /**
+     * ACTION: addSong
+     * URL: /songs/addsong
+     * Process form submission to add a song
+     */
+    public function addSong()
+    {
+        if (isset($_POST["submit_add_song"])) {
+            $this->model->addSong(
+                $_POST["artist"],
+                $_POST["track"],
+                $_POST["link"]
+            );
+        }
+        
+        // Redirect back to index
+        header('location: ' . URL . 'songs/index');
+    }
+    
+    /**
+     * ACTION: deleteSong
+     * URL: /songs/deletesong/5
+     * Delete a song by ID
+     */
+    public function deleteSong($song_id)
+    {
+        if (isset($song_id)) {
+            $this->model->deleteSong($song_id);
+        }
+        
+        header('location: ' . URL . 'songs/index');
+    }
+    
+    /**
+     * PAGE: editSong
+     * URL: /songs/editsong/5
+     * Display edit form for a song
+     */
+    public function editSong($song_id)
+    {
+        if (isset($song_id)) {
+            // Fetch song data
+            $song = $this->model->getSong($song_id);
+            
+            // Display edit form with $song data
+            require APP . 'view/_templates/header.php';
+            require APP . 'view/songs/edit.php';
+            require APP . 'view/_templates/footer.php';
+        } else {
+            header('location: ' . URL . 'songs/index');
+        }
+    }
+    
+    /**
+     * ACTION: updateSong
+     * URL: /songs/updatesong
+     * Process form submission to update a song
+     */
+    public function updateSong()
+    {
+        if (isset($_POST["submit_update_song"])) {
+            $this->model->updateSong(
+                $_POST["artist"],
+                $_POST["track"],
+                $_POST["link"],
+                $_POST['song_id']
+            );
+        }
+        
+        header('location: ' . URL . 'songs/index');
+    }
+    
+    /**
+     * AJAX ACTION: ajaxGetStats
+     * URL: /songs/ajaxgetstats
+     * Return data for AJAX request
+     */
+    public function ajaxGetStats()
+    {
+        $amount_of_songs = $this->model->getAmountOfSongs();
+        
+        // Simple API response
+        echo $amount_of_songs;
+    }
+}
+```
+
+## Controller Method Patterns
+
+### 1. Display Page (GET)
+
+Fetch data and render views:
+
+```php
+public function index()
+{
+    // 1. Fetch data from model
+    $songs = $this->model->getAllSongs();
+    $amount = $this->model->getAmountOfSongs();
+    
+    // 2. Load views (variables automatically available)
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/songs/index.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+### 2. Process Form (POST)
+
+Handle form submission and redirect:
+
+```php
+public function addSong()
+{
+    // 1. Check if form was submitted
+    if (isset($_POST["submit_add_song"])) {
+        // 2. Process data (validation should go here)
+        $this->model->addSong(
+            $_POST["artist"],
+            $_POST["track"],
+            $_POST["link"]
+        );
+    }
+    
+    // 3. Redirect to prevent form resubmission
+    header('location: ' . URL . 'songs/index');
+}
+```
+
+<Note>
+  **POST-Redirect-GET pattern**: After processing a POST request, always redirect to prevent duplicate submissions when users refresh the page.
+</Note>
+
+### 3. Action with Parameter (GET/DELETE)
+
+Process URL parameters:
+
+```php
+public function deleteSong($song_id)
+{
+    // 1. Validate parameter exists
+    if (isset($song_id)) {
+        // 2. Cast to correct type for safety
+        $song_id = (int) $song_id;
+        
+        // 3. Perform action
+        $this->model->deleteSong($song_id);
+    }
+    
+    // 4. Redirect
+    header('location: ' . URL . 'songs/index');
+}
+```
+
+### 4. AJAX Endpoint (JSON Response)
+
+Return data for AJAX calls:
+
+```php
+public function ajaxGetStats()
+{
+    $data = array(
+        'song_count' => $this->model->getAmountOfSongs(),
+        'last_updated' => time()
+    );
+    
+    // Return JSON
+    header('Content-Type: application/json');
+    echo json_encode($data);
+}
+```
+
+Call from JavaScript:
+
+```javascript
+$.ajax({
+    url: url + "songs/ajaxgetstats",
+    type: "GET",
+    success: function(data) {
+        console.log("Songs:", data.song_count);
+    }
+});
+```
+
+## Accessing Database and Models
+
+### Through the Model
+
+Preferred approach for reusable queries:
+
+```php
+public function index()
+{
+    // Use model methods
+    $songs = $this->model->getAllSongs();
+    $count = $this->model->getAmountOfSongs();
+}
+```
+
+### Direct Database Access
+
+For one-off or complex queries:
+
+```php
+public function customQuery()
+{
+    $sql = "SELECT * FROM song WHERE artist LIKE :search";
+    $query = $this->db->prepare($sql);
+    $query->execute([':search' => '%' . $_GET['q'] . '%']);
+    $results = $query->fetchAll();
+    
+    // ... load views with $results ...
+}
+```
+
+## Passing Data to Views
+
+Variables defined in the controller are automatically available in required views:
+
+```php
+public function index()
+{
+    // Define variables
+    $songs = $this->model->getAllSongs();
+    $amount_of_songs = $this->model->getAmountOfSongs();
+    $page_title = "All Songs";
+    
+    // Load view
+    require APP . 'view/songs/index.php';
+    
+    // Inside index.php, use:
+    // <?php echo $page_title; ?>
+    // <?php foreach ($songs as $song) { ... } ?>
+}
+```
+
+<Warning>
+  Views are included with `require`, so they share the same variable scope. Be careful not to accidentally override controller variables in views.
+</Warning>
+
+## Redirecting
+
+Use PHP's `header()` function:
+
+```php
+// Redirect to another page
+header('location: ' . URL . 'songs/index');
+
+// Redirect with query parameters
+header('location: ' . URL . 'songs/index?success=1');
+
+// Always exit after redirect to stop execution
+header('location: ' . URL . 'songs');
+exit;
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. Keep controllers thin">
+    Move business logic to models:
+    
+    ```php
+    // Bad: Logic in controller
+    public function addSong()
+    {
+        if (strlen($_POST['artist']) < 3) {
+            $error = "Artist name too short";
+        }
+        if (!filter_var($_POST['link'], FILTER_VALIDATE_URL)) {
+            $error = "Invalid URL";
+        }
+        // More validation...
+    }
+    
+    // Good: Logic in model
+    public function addSong()
+    {
+        $result = $this->model->addSong(
+            $_POST['artist'],
+            $_POST['track'],
+            $_POST['link']
+        );
+        
+        if (!$result['success']) {
+            // Handle error
+        }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Validate input">
+    Always validate and sanitize user input:
+    
+    ```php
+    public function deleteSong($song_id)
+    {
+        // Cast to integer
+        $song_id = (int) $song_id;
+        
+        // Validate it's positive
+        if ($song_id <= 0) {
+            header('location: ' . URL . 'songs');
+            exit;
+        }
+        
+        $this->model->deleteSong($song_id);
+        header('location: ' . URL . 'songs');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Use meaningful method names">
+    ```php
+    // Good
+    public function editSong($song_id) { }
+    public function updateSong() { }
+    public function deleteSong($song_id) { }
+    
+    // Unclear
+    public function action1() { }
+    public function doStuff() { }
+    ```
+  </Accordion>
+  
+  <Accordion title="4. Don't mix display and action methods">
+    ```php
+    // editSong() displays the form
+    public function editSong($song_id)
+    {
+        $song = $this->model->getSong($song_id);
+        require APP . 'view/songs/edit.php';
+    }
+    
+    // updateSong() processes the form
+    public function updateSong()
+    {
+        $this->model->updateSong(/* ... */);
+        header('location: ' . URL . 'songs');
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Check Authentication
+
+```php
+public function adminPanel()
+{
+    if (!isset($_SESSION['user_logged_in'])) {
+        header('location: ' . URL . 'login');
+        exit;
+    }
+    
+    // Show admin panel
+    require APP . 'view/admin/panel.php';
+}
+```
+
+### Flash Messages
+
+```php
+// Set message
+public function addSong()
+{
+    $this->model->addSong(/* ... */);
+    $_SESSION['success'] = "Song added successfully!";
+    header('location: ' . URL . 'songs');
+}
+
+// Display in view
+<?php if (isset($_SESSION['success'])): ?>
+    <div class="alert"><?php echo $_SESSION['success']; ?></div>
+    <?php unset($_SESSION['success']); ?>
+<?php endif; ?>
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Routing" icon="route" href="/concepts/routing">
+    How URLs map to controller methods
+  </Card>
+  
+  <Card title="Models" icon="database" href="/concepts/models">
+    Data layer and database operations
+  </Card>
+  
+  <Card title="Views" icon="eye" href="/concepts/views">
+    Rendering HTML output
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understanding the MVC pattern
+  </Card>
+</CardGroup>

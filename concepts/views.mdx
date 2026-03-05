@@ -1,0 +1,658 @@
+---
+title: 'Views'
+description: 'View layer in MINI: rendering templates, displaying data, and output escaping'
+---
+
+## Overview
+
+**Views** are the presentation layer in MINI's MVC architecture. They:
+- Display HTML output to users
+- Access data passed from controllers
+- Handle output escaping for security
+- Use simple PHP templating (no template engine required)
+
+Views are plain PHP files that receive data from controllers and render it as HTML.
+
+## View Structure
+
+Views are organized in `application/view/` by controller name:
+
+```
+application/view/
+├── _templates/
+│   ├── header.php          # Global header
+│   └── footer.php          # Global footer
+├── home/
+│   ├── index.php           # Home page
+│   ├── example_one.php
+│   └── example_two.php
+├── songs/
+│   ├── index.php           # Songs list
+│   └── edit.php            # Edit form
+└── problem/
+    └── index.php           # Error page
+```
+
+<Note>
+  Views are organized by controller name to keep related templates together. The `_templates/` folder contains shared layouts.
+</Note>
+
+## Loading Views in Controllers
+
+Controllers load views using `require`:
+
+```php application/controller/home.php
+class Home extends Controller
+{
+    public function index()
+    {
+        // Load three view files
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/home/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+}
+```
+
+This creates a complete page:
+1. **Header** - HTML head, CSS, navigation
+2. **Content** - Page-specific content
+3. **Footer** - Scripts, closing tags
+
+## Template Structure
+
+### Global Header
+
+Shared across all pages:
+
+```php application/view/_templates/header.php
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>MINI</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- CSS -->
+    <link href="<?php echo URL; ?>css/style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Logo -->
+    <div class="logo">
+        MINI
+    </div>
+    
+    <!-- Navigation -->
+    <div class="navigation">
+        <a href="<?php echo URL; ?>">home</a>
+        <a href="<?php echo URL; ?>home/exampleone">subpage</a>
+        <a href="<?php echo URL; ?>home/exampletwo">subpage 2</a>
+        <a href="<?php echo URL; ?>songs">songs</a>
+    </div>
+```
+
+<Note>
+  The header doesn't close the `<body>` or `<html>` tags—the footer does that.
+</Note>
+
+### Global Footer
+
+```php application/view/_templates/footer.php
+    <!-- Footer content -->
+    <div class="footer">
+        Find <a href="https://github.com/panique/mini">MINI on GitHub</a>.
+    </div>
+    
+    <!-- jQuery -->
+    <script src="//code.jquery.com/jquery-3.5.1.min.js"></script>
+    
+    <!-- Define URL for AJAX -->
+    <script>
+        var url = "<?php echo URL; ?>";
+    </script>
+    
+    <!-- Application JavaScript -->
+    <script src="<?php echo URL; ?>js/application.js"></script>
+</body>
+</html>
+```
+
+<Tip>
+  JavaScript files are loaded at the bottom to speed up page rendering. See [this Stack Overflow discussion](http://stackoverflow.com/q/2105327/1114320) for why.
+</Tip>
+
+### Page-Specific Views
+
+Simple content view:
+
+```php application/view/home/index.php
+<div class="container">
+    <h2>You are in the View: application/view/home/index.php</h2>
+    <p>In a real application this could be the homepage.</p>
+</div>
+```
+
+## Passing Data to Views
+
+Variables defined in the controller are automatically available in views:
+
+```php application/controller/songs.php
+public function index()
+{
+    // Define variables
+    $songs = $this->model->getAllSongs();
+    $amount_of_songs = $this->model->getAmountOfSongs();
+    
+    // Load views - variables are now available
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/songs/index.php';  // Can use $songs and $amount_of_songs
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+In the view:
+
+```php application/view/songs/index.php
+<div class="container">
+    <h3>Amount of songs</h3>
+    <div>
+        <?php echo $amount_of_songs; ?>
+    </div>
+    
+    <h3>List of songs</h3>
+    <table>
+        <thead>
+            <tr>
+                <td>Id</td>
+                <td>Artist</td>
+                <td>Track</td>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($songs as $song) { ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?></td>
+                </tr>
+            <?php } ?>
+        </tbody>
+    </table>
+</div>
+```
+
+<Warning>
+  Views use the same variable scope as the controller because of `require`. Be careful not to accidentally override controller variables.
+</Warning>
+
+## Escaping Output (Security)
+
+**Always escape output** to prevent Cross-Site Scripting (XSS) attacks:
+
+```php
+<!-- WRONG - Vulnerable to XSS -->
+<td><?php echo $song->artist; ?></td>
+
+<!-- CORRECT - Escaped output -->
+<td><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+```
+
+### htmlspecialchars() Explained
+
+```php
+htmlspecialchars($string, ENT_QUOTES, 'UTF-8')
+```
+
+- **$string**: The data to escape
+- **ENT_QUOTES**: Escape both double and single quotes
+- **'UTF-8'**: Character encoding (must match your database)
+
+### What Gets Escaped
+
+| Character | Becomes | Why |
+|-----------|---------|-----|
+| `<` | `&lt;` | Prevents HTML tags |
+| `>` | `&gt;` | Prevents HTML tags |
+| `"` | `&quot;` | Prevents breaking attributes |
+| `'` | `&#039;` | Prevents breaking attributes |
+| `&` | `&amp;` | Prevents entity injection |
+
+### Example: XSS Prevention
+
+If a user enters malicious data:
+
+```php
+$song->artist = '<script>alert("XSS")</script>';
+```
+
+Without escaping:
+```html
+<td><?php echo $song->artist; ?></td>
+<!-- Output: <td><script>alert("XSS")</script></td> -->
+<!-- JavaScript executes! -->
+```
+
+With escaping:
+```html
+<td><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+<!-- Output: <td>&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;</td> -->
+<!-- Displayed as text, doesn't execute -->
+```
+
+## Real-World View Examples
+
+### Display List with Forms
+
+```php application/view/songs/index.php
+<div class="container">
+    <!-- Add song form -->
+    <div class="box">
+        <h3>Add a song</h3>
+        <form action="<?php echo URL; ?>songs/addsong" method="POST">
+            <label>Artist</label>
+            <input type="text" name="artist" value="" required />
+            
+            <label>Track</label>
+            <input type="text" name="track" value="" required />
+            
+            <label>Link</label>
+            <input type="text" name="link" value="" />
+            
+            <input type="submit" name="submit_add_song" value="Submit" />
+        </form>
+    </div>
+    
+    <!-- Display count -->
+    <div class="box">
+        <h3>Amount of songs</h3>
+        <div><?php echo $amount_of_songs; ?></div>
+    </div>
+    
+    <!-- Display list -->
+    <div class="box">
+        <h3>List of songs</h3>
+        <table>
+            <thead style="background-color: #ddd; font-weight: bold;">
+                <tr>
+                    <td>Id</td>
+                    <td>Artist</td>
+                    <td>Track</td>
+                    <td>Link</td>
+                    <td>DELETE</td>
+                    <td>EDIT</td>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($songs as $song) { ?>
+                    <tr>
+                        <td><?php if (isset($song->id)) echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php if (isset($song->artist)) echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php if (isset($song->track)) echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td>
+                            <?php if (isset($song->link)) { ?>
+                                <a href="<?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>">
+                                    <?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>
+                                </a>
+                            <?php } ?>
+                        </td>
+                        <td>
+                            <a href="<?php echo URL . 'songs/deletesong/' . htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>">
+                                delete
+                            </a>
+                        </td>
+                        <td>
+                            <a href="<?php echo URL . 'songs/editsong/' . htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>">
+                                edit
+                            </a>
+                        </td>
+                    </tr>
+                <?php } ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+```
+
+### Key Points in This View
+
+<AccordionGroup>
+  <Accordion title="Form actions use URL constant">
+    ```php
+    <form action="<?php echo URL; ?>songs/addsong" method="POST">
+    ```
+    
+    This generates the full URL path correctly in any environment.
+  </Accordion>
+  
+  <Accordion title="Check if variables exist">
+    ```php
+    <?php if (isset($song->id)) echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>
+    ```
+    
+    Prevents "Undefined property" errors if the field is NULL.
+  </Accordion>
+  
+  <Accordion title="Escape data in links too">
+    ```php
+    <a href="<?php echo URL . 'songs/deletesong/' . htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>">
+    ```
+    
+    Even IDs should be escaped when building URLs.
+  </Accordion>
+  
+  <Accordion title="Escape href attributes">
+    ```php
+    <a href="<?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>">
+    ```
+    
+    Prevents malicious URLs like `javascript:alert('XSS')`
+  </Accordion>
+</AccordionGroup>
+
+## Conditional Display
+
+Show/hide content based on data:
+
+```php
+<!-- Show message if no songs -->
+<?php if (empty($songs)): ?>
+    <p>No songs found. <a href="<?php echo URL; ?>songs/add">Add one!</a></p>
+<?php else: ?>
+    <!-- Display table -->
+    <table>
+        <?php foreach ($songs as $song): ?>
+            <tr>...</tr>
+        <?php endforeach; ?>
+    </table>
+<?php endif; ?>
+```
+
+```php
+<!-- Show success message from session -->
+<?php if (isset($_SESSION['success'])): ?>
+    <div class="alert alert-success">
+        <?php echo htmlspecialchars($_SESSION['success'], ENT_QUOTES, 'UTF-8'); ?>
+        <?php unset($_SESSION['success']); ?>
+    </div>
+<?php endif; ?>
+```
+
+## Loops in Views
+
+### foreach Loop
+
+Most common for arrays:
+
+```php
+<?php foreach ($songs as $song): ?>
+    <div class="song">
+        <h3><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></h3>
+        <p><?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?></p>
+    </div>
+<?php endforeach; ?>
+```
+
+### for Loop
+
+When you need an index:
+
+```php
+<?php for ($i = 0; $i < count($songs); $i++): ?>
+    <div class="song-<?php echo $i; ?>">
+        <?php echo htmlspecialchars($songs[$i]->artist, ENT_QUOTES, 'UTF-8'); ?>
+    </div>
+<?php endfor; ?>
+```
+
+### Alternative Syntax
+
+Both styles work:
+
+```php
+<!-- Colon syntax (recommended for views) -->
+<?php foreach ($songs as $song): ?>
+    ...
+<?php endforeach; ?>
+
+<!-- Curly brace syntax -->
+<?php foreach ($songs as $song) { ?>
+    ...
+<?php } ?>
+```
+
+<Tip>
+  The colon syntax (`:` / `endforeach`) is more readable in views with lots of HTML.
+</Tip>
+
+## Forms
+
+### POST Form
+
+```php
+<form action="<?php echo URL; ?>songs/addsong" method="POST">
+    <label for="artist">Artist</label>
+    <input type="text" name="artist" id="artist" required />
+    
+    <label for="track">Track</label>
+    <input type="text" name="track" id="track" required />
+    
+    <input type="submit" name="submit_add_song" value="Add Song" />
+</form>
+```
+
+### Edit Form with Pre-filled Data
+
+```php
+<form action="<?php echo URL; ?>songs/updatesong" method="POST">
+    <!-- Hidden field for song ID -->
+    <input type="hidden" name="song_id" value="<?php echo htmlspecialchars($song->id, ENT_QUOTES, 'UTF-8'); ?>" />
+    
+    <label>Artist</label>
+    <input type="text" name="artist" value="<?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?>" />
+    
+    <label>Track</label>
+    <input type="text" name="track" value="<?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?>" />
+    
+    <input type="submit" name="submit_update_song" value="Update" />
+</form>
+```
+
+<Warning>
+  Always escape values in form inputs:
+  ```php
+  value="<?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?>"
+  ```
+  
+  Without escaping, quotes in the data would break the HTML:
+  ```php
+  // If $song->artist = 'Artist "The Great"'
+  
+  // Without escaping (broken):
+  <input value="Artist "The Great"" />
+  
+  // With escaping (correct):
+  <input value="Artist &quot;The Great&quot;" />
+  ```
+</Warning>
+
+## AJAX Integration
+
+Views can trigger AJAX requests:
+
+```php application/view/songs/index.php
+<div>
+    <button id="javascript-ajax-button">Get song count via AJAX</button>
+    <div id="javascript-ajax-result-box"></div>
+</div>
+```
+
+JavaScript (using jQuery):
+
+```javascript public/js/application.js
+$(document).ready(function() {
+    // The 'url' variable is set in footer.php
+    $('#javascript-ajax-button').on('click', function() {
+        $.ajax({
+            url: url + "songs/ajaxgetstats",
+            type: "GET",
+            success: function(response) {
+                $('#javascript-ajax-result-box').html(response);
+            }
+        });
+    });
+});
+```
+
+Controller method:
+
+```php application/controller/songs.php
+public function ajaxGetStats()
+{
+    $amount = $this->model->getAmountOfSongs();
+    echo $amount;  // Simple text response
+    
+    // Or return JSON:
+    // header('Content-Type: application/json');
+    // echo json_encode(['count' => $amount]);
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. Always escape output">
+    ```php
+    <!-- Every piece of user/database data -->
+    <?php echo htmlspecialchars($data, ENT_QUOTES, 'UTF-8'); ?>
+    ```
+    
+    The only exception is when you intentionally want to render HTML (be very careful):
+    ```php
+    <?php echo $trusted_html_content; ?>
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Keep logic in controllers">
+    ```php
+    <!-- Bad: Database query in view -->
+    <?php
+    $query = $this->db->query("SELECT * FROM song");
+    $songs = $query->fetchAll();
+    ?>
+    
+    <!-- Good: Data passed from controller -->
+    <?php foreach ($songs as $song): ?>
+        ...
+    <?php endforeach; ?>
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Use URL constant for links">
+    ```php
+    <!-- Good -->
+    <a href="<?php echo URL; ?>songs/edit/5">Edit</a>
+    <img src="<?php echo URL; ?>img/logo.png" />
+    
+    <!-- Bad: hardcoded path -->
+    <a href="/myapp/songs/edit/5">Edit</a>
+    ```
+  </Accordion>
+  
+  <Accordion title="4. Check for empty data">
+    ```php
+    <?php if (isset($song->link) && !empty($song->link)): ?>
+        <a href="<?php echo htmlspecialchars($song->link, ENT_QUOTES, 'UTF-8'); ?>">
+            View
+        </a>
+    <?php endif; ?>
+    ```
+  </Accordion>
+  
+  <Accordion title="5. Use template parts">
+    Break large views into smaller files:
+    ```php
+    <!-- In main view -->
+    <?php require APP . 'view/songs/_song_item.php'; ?>
+    
+    <!-- In _song_item.php -->
+    <div class="song">
+        <h3><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></h3>
+        ...
+    </div>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Patterns
+
+### Flash Messages
+
+```php
+<!-- In header.php or view -->
+<?php if (isset($_SESSION['success'])): ?>
+    <div class="alert alert-success">
+        <?php echo htmlspecialchars($_SESSION['success'], ENT_QUOTES, 'UTF-8'); ?>
+    </div>
+    <?php unset($_SESSION['success']); ?>
+<?php endif; ?>
+
+<?php if (isset($_SESSION['error'])): ?>
+    <div class="alert alert-error">
+        <?php echo htmlspecialchars($_SESSION['error'], ENT_QUOTES, 'UTF-8'); ?>
+    </div>
+    <?php unset($_SESSION['error']); ?>
+<?php endif; ?>
+```
+
+Set in controller:
+
+```php
+$_SESSION['success'] = "Song added successfully!";
+header('location: ' . URL . 'songs');
+```
+
+### Active Navigation
+
+```php application/view/_templates/header.php
+<div class="navigation">
+    <a href="<?php echo URL; ?>" <?php if ($active_page == 'home') echo 'class="active"'; ?>>
+        home
+    </a>
+    <a href="<?php echo URL; ?>songs" <?php if ($active_page == 'songs') echo 'class="active"'; ?>>
+        songs
+    </a>
+</div>
+```
+
+Set in controller:
+
+```php
+public function index()
+{
+    $active_page = 'songs';
+    require APP . 'view/_templates/header.php';
+    require APP . 'view/songs/index.php';
+    require APP . 'view/_templates/footer.php';
+}
+```
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="gamepad" href="/concepts/controllers">
+    How controllers pass data to views
+  </Card>
+  
+  <Card title="Models" icon="database" href="/concepts/models">
+    Where view data comes from
+  </Card>
+  
+  <Card title="Routing" icon="route" href="/concepts/routing">
+    Generating URLs for links and forms
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understanding the MVC pattern
+  </Card>
+</CardGroup>

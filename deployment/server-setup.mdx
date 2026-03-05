@@ -1,0 +1,432 @@
+---
+title: Server Configuration
+description: Configure Apache and nginx servers for MINI deployment
+---
+
+## Document Root Configuration
+
+<Warning>
+  **Critical Security Requirement**: Your web server's document root MUST point to the `/public` folder.
+</Warning>
+
+The public folder is the only directory that should be accessible via the web. This prevents direct access to:
+- Application code in `/application`
+- Configuration files
+- `.git` repository
+- System files and temp directories
+
+**Correct structure:**
+```
+/var/www/html/myproject/
+├── application/          # NOT accessible via web
+├── public/              # Document root points HERE
+│   ├── index.php
+│   ├── css/
+│   └── js/
+├── .git/                # NOT accessible via web
+└── .htaccess            # Fallback redirect
+```
+
+## Apache Configuration
+
+### Step 1: Enable mod_rewrite
+
+mod_rewrite is essential for clean URLs in MINI.
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    sudo a2enmod rewrite
+    sudo service apache2 restart
+    ```
+    
+    **Detailed guide**: [Enable mod_rewrite on Ubuntu 14.04 LTS](http://www.dev-metal.com/enable-mod_rewrite-ubuntu-14-04-lts/)
+  </Tab>
+  
+  <Tab title="CentOS/RHEL">
+    Edit `/etc/httpd/conf/httpd.conf` and ensure:
+    ```apache
+    LoadModule rewrite_module modules/mod_rewrite.so
+    ```
+    
+    Then restart:
+    ```bash
+    sudo systemctl restart httpd
+    ```
+  </Tab>
+  
+  <Tab title="XAMPP (Windows)">
+    1. Open `xampp/apache/conf/httpd.conf`
+    2. Uncomment this line:
+       ```apache
+       LoadModule rewrite_module modules/mod_rewrite.so
+       ```
+    3. Restart Apache via XAMPP control panel
+    
+    **Detailed guide**: [Enable mod_rewrite in XAMPP for Windows](http://www.leonardaustin.com/blog/technical/enable-mod_rewrite-in-xampp/)
+  </Tab>
+  
+  <Tab title="MAMP (Mac)">
+    mod_rewrite is usually enabled by default in MAMP. Verify in:
+    ```
+    /Applications/MAMP/conf/apache/httpd.conf
+    ```
+    
+    **Detailed guide**: [How to get .htaccess to work on MAMP](http://stackoverflow.com/questions/7670561/how-to-get-htaccess-to-work-on-mamp)
+  </Tab>
+  
+  <Tab title="EasyPHP (Windows)">
+    **Guide**: [EasyPHP and .htaccess](http://stackoverflow.com/questions/8158770/easyphp-and-htaccess)
+  </Tab>
+  
+  <Tab title="AMPPS">
+    **Guide**: [AMPPS rewrite enable/disable option](http://www.softaculous.com/board/index.php?tid=3634&title=AMPPS_rewrite_enable/disable_option%3F_please%3F)
+  </Tab>
+</Tabs>
+
+### Step 2: Configure Virtual Host
+
+Create or edit your virtual host configuration:
+
+<CodeGroup>
+```apache Apache 2.4 (Ubuntu/Debian)
+<VirtualHost *:80>
+    ServerName myproject.local
+    DocumentRoot "/var/www/html/myproject/public"
+    
+    <Directory "/var/www/html/myproject/public">
+        AllowOverride All
+        Require all granted
+        Options -Indexes
+    </Directory>
+    
+    ErrorLog ${APACHE_LOG_DIR}/myproject-error.log
+    CustomLog ${APACHE_LOG_DIR}/myproject-access.log combined
+</VirtualHost>
+```
+
+```apache Apache 2.2
+<VirtualHost *:80>
+    ServerName myproject.local
+    DocumentRoot "/var/www/html/myproject/public"
+    
+    <Directory "/var/www/html/myproject/public">
+        AllowOverride All
+        Order allow,deny
+        Allow from all
+        Options -Indexes
+    </Directory>
+    
+    ErrorLog logs/myproject-error.log
+    CustomLog logs/myproject-access.log combined
+</VirtualHost>
+```
+
+```apache Windows (XAMPP)
+<VirtualHost *:80>
+    ServerName myproject.local
+    DocumentRoot "C:/xampp/htdocs/myproject/public"
+    
+    <Directory "C:/xampp/htdocs/myproject/public">
+        AllowOverride All
+        Require all granted
+        Options -Indexes
+    </Directory>
+</VirtualHost>
+```
+</CodeGroup>
+
+<Accordion title="Configuration explanation">
+  - `ServerName`: Your local domain (add to `/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts`)
+  - `DocumentRoot`: Points to the `/public` folder
+  - `AllowOverride All`: Allows `.htaccess` to work
+  - `Options -Indexes`: Prevents directory listing
+  - `Require all granted` (2.4) or `Allow from all` (2.2): Grants access
+</Accordion>
+
+**Save to:**
+- Ubuntu/Debian: `/etc/apache2/sites-available/myproject.conf`
+- CentOS/RHEL: `/etc/httpd/conf.d/myproject.conf`
+- XAMPP: `xampp/apache/conf/extra/httpd-vhosts.conf`
+
+**Enable the site (Ubuntu/Debian):**
+```bash
+sudo a2ensite myproject
+sudo service apache2 reload
+```
+
+### Step 3: .htaccess Configuration
+
+MINI includes a pre-configured `.htaccess` file in `/public/.htaccess`:
+
+```apache public/.htaccess
+# Necessary to prevent problems when using a controller named "index"
+Options -MultiViews
+
+# Activates URL rewriting
+RewriteEngine On
+
+# Prevent directory listing
+Options -Indexes
+
+# Rewrite rules
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-l
+RewriteRule ^(.+)$ index.php?url=$1 [QSA,L]
+```
+
+<Info>
+  This file is already included with MINI. You don't need to create it manually.
+</Info>
+
+### Fallback .htaccess
+
+The root `.htaccess` provides fallback if the document root isn't set to `/public`:
+
+```apache .htaccess (root)
+RewriteEngine on
+RewriteRule ^(.*) public/$1 [L]
+```
+
+<Warning>
+  This is a **fallback only**. Always configure your document root properly for production.
+</Warning>
+
+## nginx Configuration
+
+nginx is fully supported with the following configuration:
+
+```nginx /etc/nginx/sites-available/myproject
+server {
+    server_name default_server _;   # Listen to any servername
+    listen      [::]:80;
+    listen      80;
+
+    root /var/www/html/myproject/public;
+
+    location / {
+        index index.php;
+        try_files /$uri /$uri/ /index.php?url=$uri;
+    }
+
+    location ~ \.(php)$ {
+        fastcgi_pass   unix:/var/run/php5-fpm.sock;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+```
+
+<Accordion title="nginx configuration notes">
+  - Adjust `fastcgi_pass` for your PHP-FPM socket location:
+    - PHP 5.x: `unix:/var/run/php5-fpm.sock`
+    - PHP 7.0: `unix:/var/run/php/php7.0-fpm.sock`
+    - PHP 7.4: `unix:/var/run/php/php7.4-fpm.sock`
+    - PHP 8.0: `unix:/var/run/php/php8.0-fpm.sock`
+    - Or TCP: `127.0.0.1:9000`
+  - `root` must point to the `/public` folder
+  - For detailed discussion, see [GitHub issue #55](https://github.com/panique/mini/issues/55)
+</Accordion>
+
+**Enable the site:**
+```bash
+sudo ln -s /etc/nginx/sites-available/myproject /etc/nginx/sites-enabled/
+sudo nginx -t  # Test configuration
+sudo service nginx reload
+```
+
+## File Permissions
+
+Set proper permissions for security:
+
+```bash
+# Navigate to project directory
+cd /var/www/html/myproject
+
+# Set directory permissions
+sudo find . -type d -exec chmod 755 {} \;
+
+# Set file permissions
+sudo find . -type f -exec chmod 644 {} \;
+
+# Restrict config file access
+sudo chmod 600 application/config/config.php
+
+# Set ownership (adjust user/group as needed)
+sudo chown -R www-data:www-data .
+```
+
+<Info>
+  Replace `www-data` with your web server user:
+  - Ubuntu/Debian: `www-data`
+  - CentOS/RHEL: `apache`
+  - Mac: `_www`
+</Info>
+
+## Installation Tutorials
+
+Detailed step-by-step installation guides:
+
+<CardGroup cols={2}>
+  <Card title="Ubuntu 14.04 LTS" icon="ubuntu" href="http://www.dev-metal.com/install-mini-30-seconds-inside-ubuntu-14-04-lts/">
+    Auto-install script for Ubuntu 14.04
+  </Card>
+  
+  <Card title="Ubuntu 12.04 LTS" icon="ubuntu" href="http://www.dev-metal.com/setup-basic-lamp-stack-linux-apache-mysql-php-ubuntu-12-04/">
+    LAMP stack setup on Ubuntu 12.04
+  </Card>
+  
+  <Card title="Ubuntu 14.04 mod_rewrite" icon="ubuntu" href="http://www.dev-metal.com/enable-mod_rewrite-ubuntu-14-04-lts/">
+    Enable mod_rewrite on Ubuntu 14.04
+  </Card>
+  
+  <Card title="Ubuntu 12.04 mod_rewrite" icon="ubuntu" href="http://www.dev-metal.com/enable-mod_rewrite-ubuntu-12-04-lts/">
+    Enable mod_rewrite on Ubuntu 12.04
+  </Card>
+  
+  <Card title="XAMPP Windows" icon="windows" href="http://www.leonardaustin.com/blog/technical/enable-mod_rewrite-in-xampp/">
+    Enable mod_rewrite in XAMPP
+  </Card>
+  
+  <Card title="MAMP Mac" icon="apple" href="http://stackoverflow.com/questions/7670561/how-to-get-htaccess-to-work-on-mamp">
+    Configure .htaccess on MAMP
+  </Card>
+  
+  <Card title="EasyPHP" icon="windows" href="http://stackoverflow.com/questions/8158770/easyphp-and-htaccess">
+    EasyPHP and .htaccess setup
+  </Card>
+  
+  <Card title="AMPPS" icon="server" href="http://www.softaculous.com/board/index.php?tid=3634">
+    AMPPS rewrite configuration
+  </Card>
+</CardGroup>
+
+## Vagrant Setup (Automated)
+
+For a fully automated development environment:
+
+### Prerequisites
+- Install [Vagrant](https://www.vagrantup.com/)
+- Install [VirtualBox](https://www.virtualbox.org/)
+
+### Setup Steps
+
+1. **Add Ubuntu box** (if not already added):
+   ```bash
+   vagrant box add ubuntu/focal64
+   ```
+
+2. **Copy Vagrant files**:
+   ```bash
+   mkdir myproject
+   cd myproject
+   # Copy Vagrantfile and bootstrap.sh from _vagrant/ folder
+   ```
+
+3. **Start Vagrant**:
+   ```bash
+   vagrant up
+   ```
+
+4. **Access the application**:
+   Open `http://192.168.33.44` in your browser
+
+<Accordion title="What Vagrant installs automatically">
+  - Ubuntu 20.04 LTS
+  - Apache 2.4
+  - PHP 7.4
+  - MySQL
+  - PHPMyAdmin
+  - Git
+  - Enables mod_rewrite
+  - Clones MINI from GitHub
+  - Creates database and imports demo data
+  - Configures everything automatically
+  
+  **Default credentials:**
+  - MySQL root password: `12345678`
+  - PHPMyAdmin password: `12345678`
+  - Project location: `/var/www/html/myproject`
+</Accordion>
+
+**Vagrant commands:**
+```bash
+vagrant up      # Start the VM
+vagrant halt    # Stop the VM
+vagrant reload  # Restart the VM
+vagrant ssh     # SSH into the VM
+vagrant destroy # Delete the VM
+```
+
+## Subdirectory Installation
+
+<Info>
+  MINI works perfectly in subdirectories without additional configuration.
+</Info>
+
+If you install MINI in a subdirectory (e.g., `example.com/myapp/`):
+
+1. Upload files to your subdirectory
+2. Ensure `.htaccess` is present in `/public`
+3. The application auto-detects the subfolder path
+
+No code changes needed! The URL detection in `application/config/config.php8` handles this automatically:
+
+```php
+define('URL_SUB_FOLDER', str_replace(URL_PUBLIC_FOLDER, '', dirname($_SERVER['SCRIPT_NAME'])));
+```
+
+## Security Best Practices
+
+<Warning>
+  Always follow these security guidelines in production:
+</Warning>
+
+1. **Document root** → `/public` folder only
+2. **File permissions** → Restrictive (644 for files, 755 for directories)
+3. **Config files** → Not web-accessible (600 permissions)
+4. **Database credentials** → Use strong passwords
+5. **Error reporting** → Disable in production (`config.php3`)
+6. **Directory listing** → Disabled (`Options -Indexes`)
+7. **Git folder** → Not in document root
+8. **.htaccess** → Properly configured
+
+## Testing Your Setup
+
+<Steps>
+  <Step title="Check mod_rewrite">
+    ```bash
+    # Apache
+    apache2ctl -M | grep rewrite
+    
+    # Should output: rewrite_module (shared)
+    ```
+  </Step>
+  
+  <Step title="Test URL routing">
+    Access these URLs:
+    - `http://yoursite.com/` → Should show homepage
+    - `http://yoursite.com/home/exampleOne` → Should show example page
+    - `http://yoursite.com/songs` → Should show songs list
+  </Step>
+  
+  <Step title="Verify security">
+    Try accessing:
+    - `http://yoursite.com/application/` → Should return 403/404
+    - `http://yoursite.com/.git/` → Should return 403/404
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Setup" icon="database" href="/installation">
+    Configure database and import demo data
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/deployment/troubleshooting">
+    Fix common server issues
+  </Card>
+</CardGroup>

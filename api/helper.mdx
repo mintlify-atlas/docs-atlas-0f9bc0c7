@@ -1,0 +1,369 @@
+---
+title: "Helper Class"
+description: "Utility functions for debugging and development"
+---
+
+## Overview
+
+The `Helper` class provides utility functions for development and debugging. Currently, it includes a PDO query debugger.
+
+Located at: `application/libs/helper.php`
+
+## Class Definition
+
+```php helper.php
+class Helper
+{
+    /**
+     * debugPDO
+     *
+     * Shows the emulated SQL query in a PDO statement.
+     * Combines the raw query and the placeholders.
+     * 
+     * @author Panique
+     * @param string $raw_sql
+     * @param array $parameters
+     * @return string
+     */
+    static public function debugPDO($raw_sql, $parameters)
+    {
+        // ... implementation
+    }
+}
+```
+
+## Methods
+
+### `debugPDO($raw_sql, $parameters)`
+
+Emulates and displays the final SQL query that PDO will execute by substituting placeholders with actual values.
+
+<ParamField path="raw_sql" type="string" required>
+  The SQL query string with placeholders (e.g., `:song_id` or `?`).
+</ParamField>
+
+<ParamField path="parameters" type="array" required>
+  Array of parameters to substitute into the query. Can be named (`:key => value`) or positional (`[value1, value2]`).
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The SQL query with all placeholders replaced by their actual values, formatted for readability.
+</ResponseField>
+
+## How It Works
+
+The `debugPDO()` method performs these steps:
+
+<Steps>
+  <Step title="Detect Placeholder Type">
+    Checks if the query uses named parameters (`:param`) or anonymous parameters (`?`).
+    
+    ```php
+    foreach ($parameters as $key => $value) {
+        if (is_string($key)) {
+            $keys[] = '/' . $key . '/'; // Named: :song_id
+        } else {
+            $keys[] = '/[?]/'; // Anonymous: ?
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Format Values">
+    Converts parameter values to human-readable format:
+    - Strings: wrapped in single quotes `'value'`
+    - Arrays: comma-separated
+    - NULL: displayed as `NULL`
+    - Numbers: displayed as-is
+    
+    ```php
+    if (is_string($value)) {
+        $values[$key] = "'" . $value . "'";
+    } elseif (is_array($value)) {
+        $values[$key] = implode(',', $value);
+    } elseif (is_null($value)) {
+        $values[$key] = 'NULL';
+    }
+    ```
+  </Step>
+  
+  <Step title="Replace Placeholders">
+    Uses regex to replace each placeholder with its formatted value:
+    
+    ```php
+    $raw_sql = preg_replace($keys, $values, $raw_sql, 1, $count);
+    ```
+  </Step>
+  
+  <Step title="Return Result">
+    Returns the complete SQL query string ready for inspection.
+  </Step>
+</Steps>
+
+## Complete Implementation
+
+```php helper.php
+static public function debugPDO($raw_sql, $parameters) 
+{
+    $keys = array();
+    $values = $parameters;
+
+    foreach ($parameters as $key => $value) {
+        // check if named parameters (':param') or anonymous parameters ('?') are used
+        if (is_string($key)) {
+            $keys[] = '/' . $key . '/';
+        } else {
+            $keys[] = '/[?]/';
+        }
+
+        // bring parameter into human-readable format
+        if (is_string($value)) {
+            $values[$key] = "'" . $value . "'";
+        } elseif (is_array($value)) {
+            $values[$key] = implode(',', $value);
+        } elseif (is_null($value)) {
+            $values[$key] = 'NULL';
+        }
+    }
+    
+    $raw_sql = preg_replace($keys, $values, $raw_sql, 1, $count);
+
+    return $raw_sql;
+}
+```
+
+## Usage Examples
+
+### Basic SELECT Query
+
+```php
+$sql = "SELECT id, artist, track FROM song WHERE id = :song_id LIMIT 1";
+$query = $this->db->prepare($sql);
+$parameters = array(':song_id' => 5);
+
+echo Helper::debugPDO($sql, $parameters);
+// Output: SELECT id, artist, track FROM song WHERE id = '5' LIMIT 1
+
+$query->execute($parameters);
+```
+
+### INSERT Query
+
+```php
+$sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+$parameters = array(
+    ':artist' => 'The Beatles',
+    ':track' => 'Hey Jude',
+    ':link' => 'https://youtube.com/watch?v=A_MjCqQoLLA'
+);
+
+echo Helper::debugPDO($sql, $parameters);
+// Output: INSERT INTO song (artist, track, link) VALUES ('The Beatles', 'Hey Jude', 'https://youtube.com/watch?v=A_MjCqQoLLA')
+```
+
+### UPDATE Query
+
+```php
+$sql = "UPDATE song SET artist = :artist, track = :track WHERE id = :song_id";
+$parameters = array(
+    ':artist' => 'Pink Floyd',
+    ':track' => 'Comfortably Numb',
+    ':song_id' => 17
+);
+
+echo Helper::debugPDO($sql, $parameters);
+// Output: UPDATE song SET artist = 'Pink Floyd', track = 'Comfortably Numb' WHERE id = '17'
+```
+
+### Anonymous Placeholders
+
+```php
+$sql = "SELECT * FROM song WHERE artist = ? AND track = ?";
+$parameters = array('Queen', 'Bohemian Rhapsody');
+
+echo Helper::debugPDO($sql, $parameters);
+// Output: SELECT * FROM song WHERE artist = 'Queen' AND track = 'Bohemian Rhapsody'
+```
+
+### NULL Values
+
+```php
+$sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+$parameters = array(
+    ':artist' => 'Unknown Artist',
+    ':track' => 'Mystery Track',
+    ':link' => null
+);
+
+echo Helper::debugPDO($sql, $parameters);
+// Output: INSERT INTO song (artist, track, link) VALUES ('Unknown Artist', 'Mystery Track', NULL)
+```
+
+## Using in Model Methods
+
+Add debugging to your model methods during development:
+
+```php
+public function getSong($song_id)
+{
+    $sql = "SELECT id, artist, track, link FROM song WHERE id = :song_id LIMIT 1";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+
+    // Debug during development
+    echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);
+    exit(); // Stop execution to see the debug output
+
+    $query->execute($parameters);
+    return $query->fetch();
+}
+```
+
+<Warning>
+  Remove or comment out `Helper::debugPDO()` calls in production code. They're meant for development debugging only.
+</Warning>
+
+## Practical Debugging Workflow
+
+<Steps>
+  <Step title="Add Debug Statement">
+    Insert `echo Helper::debugPDO($sql, $parameters);` before executing your query.
+  </Step>
+  
+  <Step title="View Output">
+    Refresh your page to see the generated SQL in the browser or logs.
+  </Step>
+  
+  <Step title="Test Query">
+    Copy the output and run it directly in phpMyAdmin or MySQL console to verify it works.
+  </Step>
+  
+  <Step title="Fix Issues">
+    If the query fails, you'll see exactly what SQL is being executed and can identify the problem.
+  </Step>
+  
+  <Step title="Remove Debug Code">
+    Once working, remove the debug statement from your code.
+  </Step>
+</Steps>
+
+## Limitations
+
+<Note>
+  **Simple Emulation**
+  
+  `debugPDO()` provides a simplified emulation of PDO's query execution. It doesn't account for:
+  - Character encoding edge cases
+  - MySQL-specific escaping rules
+  - Complex data type conversions
+  
+  It's perfect for debugging simple queries but may not be 100% accurate for very complex scenarios.
+</Note>
+
+## Alternative: PDO Error Mode
+
+MINI also enables PDO warnings by default:
+
+```php
+// In Controller::openDatabaseConnection()
+$options = array(
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
+);
+```
+
+This makes PDO emit PHP warnings when queries fail, helping you catch errors during development.
+
+## Best Practices
+
+<Accordion title="Use During Development Only">
+  Debug output should never appear in production:
+  
+  ```php
+  // Good for development:
+  if (ENVIRONMENT == 'development') {
+      echo Helper::debugPDO($sql, $parameters);
+  }
+  
+  // Or use a debug flag:
+  if (defined('DEBUG') && DEBUG === true) {
+      echo Helper::debugPDO($sql, $parameters);
+  }
+  ```
+</Accordion>
+
+<Accordion title="Combine with exit() for Debugging">
+  Stop execution after debug output to focus on the query:
+  
+  ```php
+  echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);
+  exit(); // Stops here, doesn't execute the query
+  ```
+  
+  Remove `exit()` once you're done debugging.
+</Accordion>
+
+<Accordion title="Log Instead of Echo">
+  For production debugging, log to a file instead:
+  
+  ```php
+  error_log('PDO DEBUG: ' . Helper::debugPDO($sql, $parameters));
+  ```
+</Accordion>
+
+## Real-World Example
+
+### Debugging a Complex Query
+
+```php
+public function searchSongs($artist, $track, $min_id)
+{
+    $sql = "SELECT id, artist, track, link 
+            FROM song 
+            WHERE artist LIKE :artist 
+            AND track LIKE :track 
+            AND id > :min_id 
+            ORDER BY id DESC 
+            LIMIT 20";
+    
+    $parameters = array(
+        ':artist' => '%' . $artist . '%',
+        ':track' => '%' . $track . '%',
+        ':min_id' => $min_id
+    );
+    
+    // Debug to see the actual query
+    echo '<pre>' . Helper::debugPDO($sql, $parameters) . '</pre>';
+    // Output:
+    // SELECT id, artist, track, link 
+    // FROM song 
+    // WHERE artist LIKE '%Beatles%' 
+    // AND track LIKE '%Hey%' 
+    // AND id > '10' 
+    // ORDER BY id DESC 
+    // LIMIT 20
+    
+    $query = $this->db->prepare($sql);
+    $query->execute($parameters);
+    
+    return $query->fetchAll();
+}
+```
+
+This shows you exactly what LIKE patterns and values are being used, making it easy to spot issues with wildcards or empty parameters.
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Model Class" icon="database" href="/api/model">
+    Learn about database operations
+  </Card>
+  <Card title="Database Guide" icon="server" href="/guides/database">
+    Complete database usage guide
+  </Card>
+  <Card title="CRUD Operations" icon="list-check" href="/guides/crud-operations">
+    Practical CRUD examples
+  </Card>
+  <Card title="Troubleshooting" icon="circle-exclamation" href="/deployment/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

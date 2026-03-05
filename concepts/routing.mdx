@@ -1,0 +1,420 @@
+---
+title: 'Routing System'
+description: 'How MINI maps URLs to controllers, actions, and parameters'
+---
+
+## Overview
+
+MINI uses a **simple, convention-based routing system** where URLs directly map to controller classes and methods. No route configuration files are needed—the framework automatically determines which code to execute based on the URL structure.
+
+## URL Structure
+
+All URLs follow this pattern:
+
+```
+http://yoursite.com/controller/action/param1/param2/param3
+                    └────┬────┘ └──┬──┘ └────────┬────────┘
+                         │         │             │
+                    Controller   Method      Parameters
+```
+
+### Examples
+
+| URL | Controller | Method | Parameters |
+|-----|------------|--------|------------|
+| `/` | `home` | `index` | `[]` |
+| `/songs` | `songs` | `index` | `[]` |
+| `/songs/edit/5` | `songs` | `edit` | `['5']` |
+| `/users/profile/john/settings` | `users` | `profile` | `['john', 'settings']` |
+
+<Note>
+  If no controller is specified (root URL `/`), MINI defaults to the `home` controller's `index()` method.
+</Note>
+
+## How Routing Works
+
+### 1. URL Rewriting with .htaccess
+
+Apache's mod_rewrite converts clean URLs into a query parameter:
+
+```apache application/public/.htaccess
+# Prevent directory listing
+Options -MultiViews
+Options -Indexes
+
+# Enable URL rewriting
+RewriteEngine On
+
+# If the following conditions are true:
+RewriteCond %{REQUEST_FILENAME} !-d  # Not a directory
+RewriteCond %{REQUEST_FILENAME} !-f  # Not a file
+RewriteCond %{REQUEST_FILENAME} !-l  # Not a symbolic link
+
+# Rewrite the URL:
+# /songs/edit/5 becomes index.php?url=songs/edit/5
+RewriteRule ^(.+)$ index.php?url=$1 [QSA,L]
+```
+
+**What this does:**
+- Converts `/songs/edit/5` → `index.php?url=songs/edit/5`
+- Preserves existing query strings with `[QSA]` (Query String Append)
+- Stops processing other rules with `[L]` (Last)
+- Only rewrites if the path isn't an actual file/directory (allows CSS, JS, images to load normally)
+
+### 2. URL Parsing with splitUrl()
+
+The `Application` class parses the URL into components:
+
+```php application/core/application.php
+private function splitUrl()
+{
+    if (isset($_GET['url'])) {
+        // Clean and split the URL
+        $url = trim($_GET['url'], '/');
+        $url = filter_var($url, FILTER_SANITIZE_URL);
+        $url = explode('/', $url);
+        
+        // Extract components
+        $this->url_controller = isset($url[0]) ? $url[0] : null;
+        $this->url_action = isset($url[1]) ? $url[1] : null;
+        
+        // Remove controller and action from array
+        unset($url[0], $url[1]);
+        
+        // Remaining elements are parameters
+        $this->url_params = array_values($url);
+    }
+}
+```
+
+**Example:** URL `songs/edit/5/preview`
+
+```php
+$this->url_controller = 'songs';
+$this->url_action = 'edit';
+$this->url_params = ['5', 'preview'];
+```
+
+### 3. Controller Resolution
+
+The `Application` class determines which controller to load:
+
+```php application/core/application.php
+public function __construct()
+{
+    $this->splitUrl();
+    
+    // Case 1: No controller specified - load home
+    if (!$this->url_controller) {
+        require APP . 'controller/home.php';
+        $page = new Home();
+        $page->index();
+    }
+    // Case 2: Controller file exists
+    elseif (file_exists(APP . 'controller/' . $this->url_controller . '.php')) {
+        // Load and instantiate controller
+        require APP . 'controller/' . $this->url_controller . '.php';
+        $this->url_controller = new $this->url_controller();
+        
+        // Case 2a: Method exists - call it
+        if (method_exists($this->url_controller, $this->url_action)) {
+            if (!empty($this->url_params)) {
+                // Call with parameters
+                call_user_func_array(
+                    array($this->url_controller, $this->url_action),
+                    $this->url_params
+                );
+            } else {
+                // Call without parameters
+                $this->url_controller->{$this->url_action}();
+            }
+        }
+        // Case 2b: No method specified - call index()
+        else {
+            if (strlen($this->url_action) == 0) {
+                $this->url_controller->index();
+            }
+            // Case 2c: Method doesn't exist - error page
+            else {
+                header('location: ' . URL . 'problem');
+            }
+        }
+    }
+    // Case 3: Controller doesn't exist - error page
+    else {
+        header('location: ' . URL . 'problem');
+    }
+}
+```
+
+## Routing Examples
+
+Let's trace how different URLs are handled:
+
+### Example 1: Root URL `/`
+
+<Steps>
+  <Step title="URL Rewriting">
+    No `$_GET['url']` parameter exists
+  </Step>
+  
+  <Step title="splitUrl()">
+    ```php
+    $this->url_controller = null;
+    $this->url_action = null;
+    $this->url_params = [];
+    ```
+  </Step>
+  
+  <Step title="Controller Resolution">
+    Falls into "no controller" case:
+    ```php
+    require APP . 'controller/home.php';
+    $page = new Home();
+    $page->index();
+    ```
+  </Step>
+</Steps>
+
+### Example 2: `/songs`
+
+<Steps>
+  <Step title="URL Rewriting">
+    `index.php?url=songs`
+  </Step>
+  
+  <Step title="splitUrl()">
+    ```php
+    $this->url_controller = 'songs';
+    $this->url_action = null;
+    $this->url_params = [];
+    ```
+  </Step>
+  
+  <Step title="Controller Resolution">
+    1. Controller file exists: `application/controller/songs.php`
+    2. Load and instantiate `Songs` class
+    3. No action specified, call `index()` method
+  </Step>
+</Steps>
+
+### Example 3: `/songs/deletesong/42`
+
+<Steps>
+  <Step title="URL Rewriting">
+    `index.php?url=songs/deletesong/42`
+  </Step>
+  
+  <Step title="splitUrl()">
+    ```php
+    $this->url_controller = 'songs';
+    $this->url_action = 'deletesong';
+    $this->url_params = ['42'];
+    ```
+  </Step>
+  
+  <Step title="Controller Resolution">
+    1. Controller exists: `Songs`
+    2. Method exists: `deleteSong()`
+    3. Call with parameters:
+    ```php
+    call_user_func_array(
+        array($this->url_controller, 'deletesong'),
+        ['42']
+    );
+    ```
+    Which executes: `Songs::deleteSong('42')`
+  </Step>
+</Steps>
+
+## Real-World Routing Examples
+
+Here's how the songs controller handles different routes:
+
+```php application/controller/songs.php
+class Songs extends Controller
+{
+    // Route: /songs or /songs/index
+    public function index()
+    {
+        $songs = $this->model->getAllSongs();
+        $amount_of_songs = $this->model->getAmountOfSongs();
+        
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/songs/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+    
+    // Route: /songs/editsong/5
+    public function editSong($song_id)
+    {
+        if (isset($song_id)) {
+            $song = $this->model->getSong($song_id);
+            
+            require APP . 'view/_templates/header.php';
+            require APP . 'view/songs/edit.php';
+            require APP . 'view/_templates/footer.php';
+        } else {
+            header('location: ' . URL . 'songs/index');
+        }
+    }
+    
+    // Route: /songs/deletesong/5
+    public function deleteSong($song_id)
+    {
+        if (isset($song_id)) {
+            $this->model->deleteSong($song_id);
+        }
+        header('location: ' . URL . 'songs/index');
+    }
+}
+```
+
+## Parameter Handling
+
+Parameters are passed as method arguments:
+
+```php
+// URL: /songs/deletesong/42
+public function deleteSong($song_id)
+{
+    // $song_id = '42'
+}
+
+// URL: /users/profile/john/edit
+public function profile($username, $action = 'view')
+{
+    // $username = 'john'
+    // $action = 'edit'
+}
+```
+
+<Warning>
+  All URL parameters are strings. Cast them to appropriate types:
+  ```php
+  public function deleteSong($song_id)
+  {
+      $song_id = (int) $song_id;  // Cast to integer
+      // ...
+  }
+  ```
+</Warning>
+
+## Generating URLs
+
+Use the `URL` constant to generate links:
+
+```php
+// Simple link
+<a href="<?php echo URL; ?>songs">View Songs</a>
+
+// Link with action
+<a href="<?php echo URL; ?>songs/editsong/<?php echo $song->id; ?>">Edit</a>
+
+// Form action
+<form action="<?php echo URL; ?>songs/addsong" method="POST">
+    <!-- form fields -->
+</form>
+```
+
+The `URL` constant is defined in `application/config/config.php`:
+
+```php
+define('URL', URL_PROTOCOL . URL_DOMAIN . URL_SUB_FOLDER);
+// Example: //yoursite.com/myapp/
+```
+
+## Method Name Conventions
+
+<Note>
+  Method names are **case-insensitive** in URLs. Both `/songs/editSong` and `/songs/editsong` work.
+</Note>
+
+However, use camelCase in your controller methods for readability:
+
+```php
+// Good: Clear and readable
+public function editSong($song_id) { }
+public function exampleOne() { }
+public function addNewUser() { }
+
+// Works but less readable
+public function editsong($song_id) { }
+public function exampleone() { }
+public function addnewuser() { }
+```
+
+## Debugging Routes
+
+Uncomment these lines in `splitUrl()` to debug routing:
+
+```php application/core/application.php
+private function splitUrl()
+{
+    if (isset($_GET['url'])) {
+        // ... URL parsing code ...
+        
+        // Debug output
+        echo 'Controller: ' . $this->url_controller . '<br>';
+        echo 'Action: ' . $this->url_action . '<br>';
+        echo 'Parameters: ' . print_r($this->url_params, true) . '<br>';
+    }
+}
+```
+
+## Error Handling
+
+The framework redirects to `/problem` for:
+- Non-existent controllers
+- Non-existent methods (when an action is specified)
+- Missing required parameters (if your code checks for them)
+
+Create a `problem` controller to display custom error pages:
+
+```php application/controller/problem.php
+class Problem extends Controller
+{
+    public function index()
+    {
+        require APP . 'view/_templates/header.php';
+        require APP . 'view/problem/index.php';
+        require APP . 'view/_templates/footer.php';
+    }
+}
+```
+
+## Limitations
+
+<Warning>
+  **Named routes**: MINI doesn't support named routes like Laravel or Symfony. URLs are tightly coupled to controller/method names.
+  
+  **Route parameters**: No regex constraints or type hints in routes. Validation must happen in controller methods.
+  
+  **HTTP verbs**: No built-in route filtering by HTTP method (GET, POST, etc.). Handle this in your controller:
+  ```php
+  public function deleteSong($song_id)
+  {
+      if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+          header('location: ' . URL . 'songs');
+          exit;
+      }
+      // ...
+  }
+  ```
+</Warning>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand the overall MVC structure
+  </Card>
+  
+  <Card title="Controllers" icon="gamepad" href="/concepts/controllers">
+    Learn how to create controller methods
+  </Card>
+  
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure URL settings and .htaccess
+  </Card>
+</CardGroup>

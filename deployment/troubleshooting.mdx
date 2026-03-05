@@ -1,0 +1,614 @@
+---
+title: Troubleshooting
+description: Common deployment issues and solutions for MINI
+---
+
+## Common Issues
+
+### mod_rewrite Not Working
+
+<Warning>
+  This is the most common issue. MINI requires mod_rewrite for clean URLs.
+</Warning>
+
+**Symptoms:**
+- 404 errors on all pages except homepage
+- "Not Found" errors when accessing routes
+- URLs like `/songs` don't work
+
+**Solutions:**
+
+<AccordionGroup>
+  <Accordion title="1. Enable mod_rewrite module">
+    <Tabs>
+      <Tab title="Ubuntu/Debian">
+        ```bash
+        sudo a2enmod rewrite
+        sudo service apache2 restart
+        ```
+        
+        Verify it's enabled:
+        ```bash
+        apache2ctl -M | grep rewrite
+        # Should show: rewrite_module (shared)
+        ```
+      </Tab>
+      
+      <Tab title="CentOS/RHEL">
+        Edit `/etc/httpd/conf/httpd.conf` and ensure:
+        ```apache
+        LoadModule rewrite_module modules/mod_rewrite.so
+        ```
+        
+        Restart:
+        ```bash
+        sudo systemctl restart httpd
+        ```
+      </Tab>
+      
+      <Tab title="XAMPP">
+        Open `xampp/apache/conf/httpd.conf` and uncomment:
+        ```apache
+        LoadModule rewrite_module modules/mod_rewrite.so
+        ```
+        
+        Restart Apache via XAMPP control panel.
+      </Tab>
+    </Tabs>
+  </Accordion>
+
+  <Accordion title="2. Enable .htaccess support">
+    Your virtual host must allow `.htaccess` overrides:
+    
+    ```apache
+    <Directory "/var/www/html/myproject/public">
+        AllowOverride All  # This line is crucial
+        Require all granted
+    </Directory>
+    ```
+    
+    <Warning>
+      If `AllowOverride` is set to `None`, `.htaccess` files are ignored!
+    </Warning>
+  </Accordion>
+
+  <Accordion title="3. Verify .htaccess exists">
+    Check that `/public/.htaccess` exists and is readable:
+    
+    ```bash
+    ls -la /var/www/html/myproject/public/.htaccess
+    
+    # Should show: -rw-r--r-- ... .htaccess
+    ```
+    
+    If missing, create it with the correct content from [server setup](/deployment/server-setup#step-3-htaccess-configuration).
+  </Accordion>
+
+  <Accordion title="4. Check file permissions">
+    The `.htaccess` file must be readable by the web server:
+    
+    ```bash
+    chmod 644 /var/www/html/myproject/public/.htaccess
+    ```
+  </Accordion>
+</AccordionGroup>
+
+**Alternative solution:**
+
+If you cannot enable mod_rewrite, use [TINY](https://github.com/panique/tiny), MINI's smaller brother that works without mod_rewrite.
+
+### Database Connection Errors
+
+**Symptoms:**
+- "Could not connect to database" errors
+- PDO exceptions
+- Blank pages when accessing database-dependent routes
+
+**Solutions:**
+
+<Steps>
+  <Step title="Verify database credentials">
+    Edit `application/config/config.php5-59`:
+    
+    ```php
+    define('DB_TYPE', 'mysql');
+    define('DB_HOST', '127.0.0.1');
+    define('DB_NAME', 'mini');
+    define('DB_USER', 'root');
+    define('DB_PASS', 'your_password');  // Change this!
+    define('DB_CHARSET', 'utf8');
+    ```
+  </Step>
+  
+  <Step title="Test database connection">
+    ```bash
+    mysql -h 127.0.0.1 -u root -p mini
+    # Enter password when prompted
+    ```
+    
+    If this fails, your credentials are incorrect.
+  </Step>
+  
+  <Step title="Check database exists">
+    ```bash
+    mysql -u root -p -e "SHOW DATABASES LIKE 'mini';"
+    ```
+    
+    If empty, create it:
+    ```bash
+    mysql -u root -p < _install/01-create-database.sql
+    mysql -u root -p < _install/02-create-table-song.sql
+    mysql -u root -p < _install/03-insert-demo-data-into-table-song.sql
+    ```
+  </Step>
+  
+  <Step title="Verify PDO MySQL extension">
+    ```bash
+    php -m | grep pdo_mysql
+    ```
+    
+    If not found, install it:
+    ```bash
+    # Ubuntu/Debian
+    sudo apt-get install php-mysql
+    
+    # CentOS/RHEL
+    sudo yum install php-mysql
+    ```
+  </Step>
+</Steps>
+
+<Accordion title="MySQL socket connection error">
+  If you see "Can't connect to local MySQL server through socket":
+  
+  Change `DB_HOST` from `localhost` to `127.0.0.1`:
+  ```php
+  define('DB_HOST', '127.0.0.1');  // Use IP instead of localhost
+  ```
+  
+  This forces PDO to use TCP instead of socket connection.
+</Accordion>
+
+### 404 Errors on All Routes
+
+**Symptoms:**
+- Homepage works, but all other routes return 404
+- Apache error: "File not found"
+
+**Diagnosis:**
+
+<Steps>
+  <Step title="Check document root">
+    Your document root MUST point to `/public`:
+    
+    ```apache
+    DocumentRoot "/var/www/html/myproject/public"  # Correct
+    # NOT
+    DocumentRoot "/var/www/html/myproject"  # Wrong!
+    ```
+  </Step>
+  
+  <Step title="Test .htaccess is working">
+    Add this to the top of `/public/.htaccess`:
+    ```apache
+    # TEST
+    Redirect 301 /test http://google.com
+    ```
+    
+    Visit `http://yoursite.com/test`. If you're NOT redirected to Google, `.htaccess` is not being processed.
+    
+    Remove the test line after checking.
+  </Step>
+  
+  <Step title="Check Apache error log">
+    ```bash
+    # Ubuntu/Debian
+    sudo tail -f /var/log/apache2/error.log
+    
+    # CentOS/RHEL
+    sudo tail -f /var/log/httpd/error_log
+    
+    # XAMPP
+    # Check xampp/apache/logs/error.log
+    ```
+    
+    Look for `.htaccess` or rewrite-related errors.
+  </Step>
+</Steps>
+
+### Permission Denied Errors
+
+**Symptoms:**
+- "Permission denied" in error logs
+- 403 Forbidden errors
+- Cannot read/write files
+
+**Solutions:**
+
+```bash
+cd /var/www/html/myproject
+
+# Fix ownership
+sudo chown -R www-data:www-data .
+
+# Fix directory permissions
+sudo find . -type d -exec chmod 755 {} \;
+
+# Fix file permissions
+sudo find . -type f -exec chmod 644 {} \;
+
+# Secure config file
+sudo chmod 600 application/config/config.php
+```
+
+<Info>
+  Replace `www-data` with your web server user:
+  - Ubuntu/Debian: `www-data`
+  - CentOS/RHEL: `apache`
+  - Mac: `_www`
+</Info>
+
+### PHP Version Compatibility
+
+#### PHP 7.0+ Error Class Issue
+
+<Warning>
+  PHP 7.0 introduced an internal `Error` class, conflicting with MINI's original `Error` class.
+</Warning>
+
+**Solution:** MINI has been updated to use `Problem` instead of `Error`.
+
+**If you see errors about the Error class:**
+
+1. Update to the latest MINI version (already renamed to Problem)
+2. Or manually rename:
+   - `application/controller/error.php` → `problem.php`
+   - Inside the file, change `class Error` → `class Problem`
+   - Update references in `application/core/application.php`
+
+**From README:**
+> The project was written in PHP5 times, but with the release of PHP7 it's not possible anymore to name a class "Error" as PHP itself has a internal Error class now. Renaming was the most simple solution.
+
+#### PHP 8.0+ Compatibility
+
+<Info>
+  MINI is not extensively tested with PHP 8.0+ but should work fine. Report issues on [GitHub](https://github.com/panique/mini/issues).
+</Info>
+
+Common PHP 8 issues:
+- Deprecation notices for certain syntax
+- Type juggling changes
+- Named parameters
+
+**Enable error reporting to diagnose:**
+
+```php application/config/config.php
+define('ENVIRONMENT', 'development');
+
+if (ENVIRONMENT == 'development') {
+    error_reporting(E_ALL);
+    ini_set("display_errors", 1);
+}
+```
+
+### nginx Issues
+
+#### PHP files downloading instead of executing
+
+**Cause:** PHP-FPM not configured correctly.
+
+**Solution:**
+
+1. Verify PHP-FPM is running:
+   ```bash
+   sudo service php7.4-fpm status  # Adjust version
+   ```
+
+2. Check socket path in nginx config:
+   ```nginx
+   location ~ \.(php)$ {
+       # Use correct socket path for your PHP version
+       fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+       fastcgi_index index.php;
+       fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+       include fastcgi_params;
+   }
+   ```
+
+3. Test nginx config:
+   ```bash
+   sudo nginx -t
+   sudo service nginx reload
+   ```
+
+#### 404 errors with nginx
+
+**Check the `try_files` directive:**
+
+```nginx
+location / {
+    index index.php;
+    try_files /$uri /$uri/ /index.php?url=$uri;
+}
+```
+
+See [GitHub issue #55](https://github.com/panique/mini/issues/55) for detailed nginx discussion.
+
+### Subdirectory Installation Issues
+
+**Symptoms:**
+- Application works on root domain but not in subdirectory
+- CSS/JS not loading in subdirectory
+- Routes broken in subdirectory
+
+**Solutions:**
+
+<Accordion title="1. Verify auto-detection is working">
+  MINI auto-detects subdirectories. Check `application/config/config.php8`:
+  
+  ```php
+  define('URL_SUB_FOLDER', str_replace(URL_PUBLIC_FOLDER, '', dirname($_SERVER['SCRIPT_NAME'])));
+  define('URL', URL_PROTOCOL . URL_DOMAIN . URL_SUB_FOLDER);
+  ```
+  
+  Debug by adding temporarily:
+  ```php
+  echo URL; // Should show http://yoursite.com/subfolder/
+  exit;
+  ```
+</Accordion>
+
+<Accordion title="2. Ensure .htaccess is present">
+  The `/public/.htaccess` must be present in the subdirectory:
+  ```
+  /var/www/html/subfolder/myproject/public/.htaccess
+  ```
+</Accordion>
+
+<Accordion title="3. Check base href in templates">
+  If CSS/JS not loading, verify paths in `application/view/_templates/header.php` use the `URL` constant:
+  
+  ```php
+  <link href="<?php echo URL; ?>css/style.css" rel="stylesheet">
+  ```
+</Accordion>
+
+### Blank White Pages
+
+**Symptoms:**
+- Completely blank page
+- No error messages
+- Nothing in browser console
+
+**Diagnosis:**
+
+<Steps>
+  <Step title="Enable error reporting">
+    Edit `application/config/config.php3`:
+    ```php
+    define('ENVIRONMENT', 'development');
+    ```
+  </Step>
+  
+  <Step title="Check PHP error log">
+    ```bash
+    # Ubuntu/Debian
+    sudo tail -f /var/log/apache2/error.log
+    
+    # Or check PHP error log location:
+    php -i | grep error_log
+    ```
+  </Step>
+  
+  <Step title="Check PHP syntax">
+    ```bash
+    php -l application/core/application.php
+    php -l application/controller/home.php
+    # etc.
+    ```
+  </Step>
+  
+  <Step title="Increase PHP memory">
+    Add to `.htaccess` or `php.ini`:
+    ```ini
+    memory_limit = 128M
+    ```
+  </Step>
+</Steps>
+
+## Debugging Tips
+
+### Enable Development Mode
+
+```php application/config/config.php
+define('ENVIRONMENT', 'development');
+
+if (ENVIRONMENT == 'development') {
+    error_reporting(E_ALL);
+    ini_set("display_errors", 1);
+}
+```
+
+<Warning>
+  Always set to `'production'` on live sites!
+</Warning>
+
+### Debug PDO Queries
+
+MINI includes a PDO debugger tool:
+
+```php
+$sql = "SELECT id, artist, track FROM song WHERE id = :song_id";
+$query = $this->db->prepare($sql);
+$parameters = array(':song_id' => $song_id);
+
+// Debug: Show the query with parameters
+echo Helper::debugPDO($sql, $parameters);
+
+$query->execute($parameters);
+```
+
+Find the debugger in `application/libs/helper.php`.
+
+### Check Apache/nginx Logs
+
+```bash
+# Apache (Ubuntu/Debian)
+sudo tail -f /var/log/apache2/error.log
+sudo tail -f /var/log/apache2/access.log
+
+# Apache (CentOS/RHEL)
+sudo tail -f /var/log/httpd/error_log
+sudo tail -f /var/log/httpd/access_log
+
+# nginx
+sudo tail -f /var/log/nginx/error.log
+sudo tail -f /var/log/nginx/access.log
+
+# XAMPP
+# Check xampp/apache/logs/error.log
+```
+
+### Test PHP Configuration
+
+Create `info.php` in `/public`:
+
+```php
+<?php
+phpinfo();
+```
+
+Access `http://yoursite.com/info.php` and check:
+- PHP version
+- Loaded extensions (PDO, pdo_mysql)
+- Configuration directives
+
+<Warning>
+  Delete `info.php` after testing! It exposes sensitive information.
+</Warning>
+
+### Test URL Rewriting
+
+Create `test.php` in `/public`:
+
+```php
+<?php
+echo "Direct file access works!";
+echo "<br>URL: " . $_SERVER['REQUEST_URI'];
+echo "<br>SCRIPT_NAME: " . $_SERVER['SCRIPT_NAME'];
+```
+
+Test:
+- Direct access: `http://yoursite.com/test.php` → Should work
+- Routed access: `http://yoursite.com/home` → Should show MINI page
+
+If direct works but routing doesn't, it's a mod_rewrite issue.
+
+## Performance Issues
+
+### Slow Page Load
+
+<AccordionGroup>
+  <Accordion title="Enable OPcache">
+    For PHP 5.5+:
+    
+    ```ini php.ini
+    opcache.enable=1
+    opcache.memory_consumption=128
+    opcache.max_accelerated_files=4000
+    opcache.revalidate_freq=60
+    ```
+    
+    Restart Apache/PHP-FPM after changes.
+  </Accordion>
+
+  <Accordion title="Optimize database queries">
+    Use the PDO debugger to identify slow queries:
+    
+    ```php
+    echo Helper::debugPDO($sql, $parameters);
+    ```
+    
+    Add indexes to frequently queried columns.
+  </Accordion>
+
+  <Accordion title="Check database connection">
+    Ensure `DB_HOST` uses the fastest connection method:
+    
+    - Socket: `localhost` (fastest, if available)
+    - TCP: `127.0.0.1` (if socket fails)
+  </Accordion>
+</AccordionGroup>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/panique/mini/issues">
+    Report bugs and request features
+  </Card>
+  
+  <Card title="Stack Overflow" icon="stack-overflow" href="https://stackoverflow.com/questions/tagged/mini-php">
+    Ask questions and search existing answers
+  </Card>
+  
+  <Card title="Documentation" icon="book" href="/">
+    Browse the complete documentation
+  </Card>
+  
+  <Card title="Source Code" icon="code" href="https://github.com/panique/mini">
+    View the source code on GitHub
+  </Card>
+</CardGroup>
+
+<Info>
+  When reporting issues, include:
+  - PHP version (`php -v`)
+  - Web server (Apache/nginx) version
+  - Operating system
+  - Error messages from logs
+  - Steps to reproduce
+</Info>
+
+## Quick Reference Checklist
+
+<Steps>
+  <Step title="PHP requirements">
+    ✅ PHP 5.3.0+ installed  
+    ✅ PDO and pdo_mysql extensions enabled  
+    ✅ Error reporting configured
+  </Step>
+  
+  <Step title="Web server">
+    ✅ mod_rewrite enabled (Apache)  
+    ✅ Virtual host points to `/public`  
+    ✅ AllowOverride All set  
+    ✅ `.htaccess` present and readable
+  </Step>
+  
+  <Step title="Database">
+    ✅ MySQL installed and running  
+    ✅ Database created  
+    ✅ Tables imported  
+    ✅ Credentials in config.php correct
+  </Step>
+  
+  <Step title="Permissions">
+    ✅ Files owned by web server user  
+    ✅ Directories: 755  
+    ✅ Files: 644  
+    ✅ Config: 600
+  </Step>
+  
+  <Step title="Security">
+    ✅ Document root = `/public` only  
+    ✅ Directory listing disabled  
+    ✅ `.git` not accessible  
+    ✅ Error reporting off in production
+  </Step>
+</Steps>
+
+## Next Steps
+
+<Card title="Back to Server Setup" icon="server" href="/deployment/server-setup">
+  Review server configuration steps
+</Card>

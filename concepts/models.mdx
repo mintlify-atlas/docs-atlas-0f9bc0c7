@@ -1,0 +1,640 @@
+---
+title: 'Models'
+description: 'Data layer in MINI: database operations, PDO, and CRUD methods'
+---
+
+## Overview
+
+**Models** handle all database interactions and business logic in MINI. They encapsulate SQL queries, data validation, and data transformations, keeping this logic separate from controllers and views.
+
+MINI uses **PDO (PHP Data Objects)** for secure, database-agnostic data access with prepared statements.
+
+## Model Structure
+
+The base model class:
+
+```php application/model/model.php
+class Model
+{
+    /**
+     * @param object $db A PDO database connection
+     */
+    function __construct($db)
+    {
+        try {
+            $this->db = $db;
+        } catch (PDOException $e) {
+            exit('Database connection could not be established.');
+        }
+    }
+    
+    // CRUD methods go here...
+}
+```
+
+The model receives a PDO connection from the controller and uses it for all queries.
+
+## Database Connection via PDO
+
+The controller establishes the PDO connection:
+
+```php application/core/controller.php
+private function openDatabaseConnection()
+{
+    // PDO options
+    $options = array(
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_OBJ,
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
+    );
+    
+    // Create PDO connection
+    $this->db = new PDO(
+        DB_TYPE . ':host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
+        DB_USER,
+        DB_PASS,
+        $options
+    );
+}
+```
+
+### PDO Configuration
+
+<AccordionGroup>
+  <Accordion title="FETCH_OBJ - Fetch as objects">
+    Results are returned as objects:
+    ```php
+    $song = $query->fetch();
+    echo $song->artist;  // Object property access
+    echo $song->track;
+    ```
+    
+    Alternative: `PDO::FETCH_ASSOC` for associative arrays:
+    ```php
+    echo $song['artist'];  // Array access
+    echo $song['track'];
+    ```
+  </Accordion>
+  
+  <Accordion title="ERRMODE_WARNING - Show SQL errors">
+    PDO will display SQL errors as PHP warnings during development.
+    
+    For production, use `PDO::ERRMODE_EXCEPTION` and catch exceptions:
+    ```php
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    ```
+  </Accordion>
+  
+  <Accordion title="charset=utf8 - Character encoding">
+    Ensures proper handling of international characters in database:
+    ```php
+    DB_CHARSET = 'utf8'
+    // or
+    DB_CHARSET = 'utf8mb4'  // For emoji support
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## CRUD Operations
+
+Here are real examples from the MINI framework:
+
+### Read All Records
+
+Fetch all rows from a table:
+
+```php application/model/model.php
+/**
+ * Get all songs from database
+ */
+public function getAllSongs()
+{
+    $sql = "SELECT id, artist, track, link FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    // fetchAll() returns all result rows
+    return $query->fetchAll();
+}
+```
+
+Use in controller:
+
+```php
+$songs = $this->model->getAllSongs();
+// Array of objects: $songs[0]->artist, $songs[0]->track, etc.
+```
+
+### Read Single Record
+
+Fetch one row by ID:
+
+```php application/model/model.php
+/**
+ * Get a single song from database
+ */
+public function getSong($song_id)
+{
+    $sql = "SELECT id, artist, track, link FROM song WHERE id = :song_id LIMIT 1";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+    
+    $query->execute($parameters);
+    
+    // fetch() returns exactly one result
+    return $query->fetch();
+}
+```
+
+<Note>
+  **:song_id** is a named placeholder. PDO will safely escape the value, preventing SQL injection.
+</Note>
+
+Use in controller:
+
+```php
+$song = $this->model->getSong(5);
+echo $song->artist;  // Access properties
+echo $song->track;
+```
+
+### Create Record
+
+Insert a new row:
+
+```php application/model/model.php
+/**
+ * Add a song to database
+ * @param string $artist Artist name
+ * @param string $track Track name  
+ * @param string $link Link URL
+ */
+public function addSong($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $parameters = array(
+        ':artist' => $artist,
+        ':track' => $track,
+        ':link' => $link
+    );
+    
+    $query->execute($parameters);
+}
+```
+
+<Warning>
+  **Never** concatenate user input into SQL strings:
+  ```php
+  // DANGEROUS - SQL injection vulnerability
+  $sql = "INSERT INTO song (artist) VALUES ('$artist')";
+  
+  // SAFE - parameterized query
+  $sql = "INSERT INTO song (artist) VALUES (:artist)";
+  $query->execute([':artist' => $artist]);
+  ```
+</Warning>
+
+Use in controller:
+
+```php
+$this->model->addSong(
+    $_POST['artist'],
+    $_POST['track'],
+    $_POST['link']
+);
+```
+
+### Update Record
+
+Modify an existing row:
+
+```php application/model/model.php
+/**
+ * Update a song in database
+ * @param string $artist Artist name
+ * @param string $track Track name
+ * @param string $link Link URL
+ * @param int $song_id Song ID
+ */
+public function updateSong($artist, $track, $link, $song_id)
+{
+    $sql = "UPDATE song SET artist = :artist, track = :track, link = :link WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(
+        ':artist' => $artist,
+        ':track' => $track,
+        ':link' => $link,
+        ':song_id' => $song_id
+    );
+    
+    $query->execute($parameters);
+}
+```
+
+Use in controller:
+
+```php
+$this->model->updateSong(
+    $_POST['artist'],
+    $_POST['track'],
+    $_POST['link'],
+    $_POST['song_id']
+);
+```
+
+### Delete Record
+
+Remove a row:
+
+```php application/model/model.php
+/**
+ * Delete a song from the database
+ * @param int $song_id ID of song to delete
+ */
+public function deleteSong($song_id)
+{
+    $sql = "DELETE FROM song WHERE id = :song_id";
+    $query = $this->db->prepare($sql);
+    $parameters = array(':song_id' => $song_id);
+    
+    $query->execute($parameters);
+}
+```
+
+Use in controller:
+
+```php
+$this->model->deleteSong(5);
+```
+
+### Aggregate Queries
+
+Count, sum, average, etc.:
+
+```php application/model/model.php
+/**
+ * Get count of songs
+ */
+public function getAmountOfSongs()
+{
+    $sql = "SELECT COUNT(id) AS amount_of_songs FROM song";
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    // Access the aliased column
+    return $query->fetch()->amount_of_songs;
+}
+```
+
+## Prepared Statements
+
+Prepared statements prevent SQL injection and improve performance.
+
+### How They Work
+
+```php
+// 1. Prepare the statement with placeholders
+$sql = "SELECT * FROM song WHERE artist = :artist AND year > :year";
+$query = $this->db->prepare($sql);
+
+// 2. Bind parameters (PDO escapes them automatically)
+$parameters = array(
+    ':artist' => $user_input_artist,  // Safe even with special characters
+    ':year' => $user_input_year
+);
+
+// 3. Execute with parameters
+$query->execute($parameters);
+
+// 4. Fetch results
+$results = $query->fetchAll();
+```
+
+### Named vs Positional Placeholders
+
+<Tabs>
+  <Tab title="Named (Recommended)">
+    ```php
+    $sql = "INSERT INTO song (artist, track) VALUES (:artist, :track)";
+    $params = array(
+        ':artist' => 'Queen',
+        ':track' => 'Bohemian Rhapsody'
+    );
+    $query->execute($params);
+    ```
+    
+    **Pros**: Clear, order-independent, reusable
+  </Tab>
+  
+  <Tab title="Positional (Alternative)">
+    ```php
+    $sql = "INSERT INTO song (artist, track) VALUES (?, ?)";
+    $params = array('Queen', 'Bohemian Rhapsody');
+    $query->execute($params);
+    ```
+    
+    **Pros**: More concise
+    **Cons**: Order matters, less readable
+  </Tab>
+</Tabs>
+
+## Debugging PDO Queries
+
+MINI includes a `Helper::debugPDO()` utility:
+
+```php application/model/model.php
+public function addSong($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $parameters = array(
+        ':artist' => $artist,
+        ':track' => $track,
+        ':link' => $link
+    );
+    
+    // Debug: see the actual SQL that will execute
+    echo '[ PDO DEBUG ]: ' . Helper::debugPDO($sql, $parameters);
+    exit();
+    
+    $query->execute($parameters);
+}
+```
+
+Output:
+```sql
+[ PDO DEBUG ]: INSERT INTO song (artist, track, link) VALUES ('Queen', 'Bohemian Rhapsody', 'https://...')
+```
+
+<Note>
+  This is for **development only**. Remove or comment out debug statements in production.
+</Note>
+
+## Input Handling
+
+From the model comments:
+
+> Please note that it's not necessary to "clean" our input in any way. With PDO all input is escaped properly automatically. We also don't use strip_tags() etc. here so we keep the input 100% original (so it's possible to save HTML and JS to the database, which is a valid use case). **Data will only be cleaned when putting it out in the views**.
+
+### In Models: Store Raw Data
+
+```php
+public function addSong($artist, $track, $link)
+{
+    // No need for htmlspecialchars() or strip_tags()
+    // PDO handles SQL escaping
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $query->execute([
+        ':artist' => $artist,  // Raw input, safely escaped by PDO
+        ':track' => $track,
+        ':link' => $link
+    ]);
+}
+```
+
+### In Views: Escape Output
+
+```php
+<!-- ALWAYS escape when displaying -->
+<td><?php echo htmlspecialchars($song->artist, ENT_QUOTES, 'UTF-8'); ?></td>
+<td><?php echo htmlspecialchars($song->track, ENT_QUOTES, 'UTF-8'); ?></td>
+```
+
+See [Views documentation](/concepts/views) for more on output escaping.
+
+## Advanced Queries
+
+### WHERE with Multiple Conditions
+
+```php
+public function searchSongs($artist, $min_year)
+{
+    $sql = "SELECT * FROM song 
+            WHERE artist LIKE :artist 
+            AND year >= :min_year
+            ORDER BY year DESC";
+    
+    $query = $this->db->prepare($sql);
+    $query->execute([
+        ':artist' => '%' . $artist . '%',  // LIKE with wildcards
+        ':min_year' => $min_year
+    ]);
+    
+    return $query->fetchAll();
+}
+```
+
+### JOIN Queries
+
+```php
+public function getSongsWithGenre()
+{
+    $sql = "SELECT song.*, genre.name AS genre_name
+            FROM song
+            INNER JOIN genre ON song.genre_id = genre.id
+            ORDER BY song.artist";
+    
+    $query = $this->db->prepare($sql);
+    $query->execute();
+    
+    return $query->fetchAll();
+}
+```
+
+### INSERT and Get ID
+
+```php
+public function addSong($artist, $track, $link)
+{
+    $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+    $query = $this->db->prepare($sql);
+    $query->execute([
+        ':artist' => $artist,
+        ':track' => $track,
+        ':link' => $link
+    ]);
+    
+    // Get the auto-increment ID
+    return $this->db->lastInsertId();
+}
+```
+
+Use in controller:
+
+```php
+$new_song_id = $this->model->addSong('Artist', 'Track', 'Link');
+header('location: ' . URL . 'songs/view/' . $new_song_id);
+```
+
+### Transaction Support
+
+```php
+public function transferSongs($from_album_id, $to_album_id)
+{
+    try {
+        // Start transaction
+        $this->db->beginTransaction();
+        
+        // Multiple queries
+        $sql1 = "UPDATE song SET album_id = :to WHERE album_id = :from";
+        $query1 = $this->db->prepare($sql1);
+        $query1->execute([':from' => $from_album_id, ':to' => $to_album_id]);
+        
+        $sql2 = "UPDATE album SET song_count = song_count + 1 WHERE id = :to";
+        $query2 = $this->db->prepare($sql2);
+        $query2->execute([':to' => $to_album_id]);
+        
+        // Commit if all succeeded
+        $this->db->commit();
+        return true;
+        
+    } catch (Exception $e) {
+        // Rollback on error
+        $this->db->rollBack();
+        return false;
+    }
+}
+```
+
+## Fetch Methods
+
+PDO provides several ways to retrieve results:
+
+```php
+// Fetch all rows
+$query->fetchAll();  // Array of objects
+
+// Fetch one row
+$query->fetch();     // Single object
+
+// Fetch single column value
+$query->fetchColumn();  // Scalar value
+
+// Fetch as associative array
+$query->fetchAll(PDO::FETCH_ASSOC);
+
+// Fetch with custom class
+$query->fetchAll(PDO::FETCH_CLASS, 'Song');
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. Use prepared statements always">
+    Even for simple queries:
+    ```php
+    // Bad
+    $sql = "SELECT * FROM song WHERE id = $id";
+    
+    // Good
+    $sql = "SELECT * FROM song WHERE id = :id";
+    $query->execute([':id' => $id]);
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Return data, don't echo">
+    ```php
+    // Bad
+    public function getAllSongs()
+    {
+        $query = $this->db->query("SELECT * FROM song");
+        foreach ($query->fetchAll() as $song) {
+            echo $song->artist;  // Don't output in model!
+        }
+    }
+    
+    // Good
+    public function getAllSongs()
+    {
+        $query = $this->db->prepare("SELECT * FROM song");
+        $query->execute();
+        return $query->fetchAll();  // Return data
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Validate in models">
+    ```php
+    public function addSong($artist, $track, $link)
+    {
+        // Validate before inserting
+        if (strlen($artist) < 2) {
+            return ['success' => false, 'error' => 'Artist name too short'];
+        }
+        
+        if (!filter_var($link, FILTER_VALIDATE_URL)) {
+            return ['success' => false, 'error' => 'Invalid URL'];
+        }
+        
+        // Insert
+        $sql = "INSERT INTO song (artist, track, link) VALUES (:artist, :track, :link)";
+        $query = $this->db->prepare($sql);
+        $query->execute([':artist' => $artist, ':track' => $track, ':link' => $link]);
+        
+        return ['success' => true, 'id' => $this->db->lastInsertId()];
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="4. Handle errors gracefully">
+    ```php
+    public function getSong($song_id)
+    {
+        $sql = "SELECT * FROM song WHERE id = :id LIMIT 1";
+        $query = $this->db->prepare($sql);
+        $query->execute([':id' => $song_id]);
+        
+        $result = $query->fetch();
+        
+        // Check if song exists
+        if (!$result) {
+            return null;  // Or throw exception
+        }
+        
+        return $result;
+    }
+    ```
+    
+    In controller:
+    ```php
+    $song = $this->model->getSong($id);
+    if (!$song) {
+        header('location: ' . URL . 'error/notfound');
+        exit;
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Notes
+
+<Warning>
+  **SQL Injection Prevention**:
+  
+  1. **Always use prepared statements** with placeholders
+  2. **Never** concatenate user input into SQL
+  3. **Never trust** user input—even from hidden form fields
+  4. Cast numeric inputs: `(int) $song_id`
+  5. Validate URLs: `filter_var($link, FILTER_VALIDATE_URL)`
+</Warning>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Controllers" icon="gamepad" href="/concepts/controllers">
+    How controllers use models
+  </Card>
+  
+  <Card title="Views" icon="eye" href="/concepts/views">
+    Displaying model data safely
+  </Card>
+  
+  <Card title="Database Setup" icon="database" href="/installation">
+    Configuring database connection
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understanding MVC structure
+  </Card>
+</CardGroup>

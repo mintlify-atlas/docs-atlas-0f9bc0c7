@@ -1,97 +1,197 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "MINI PHP Framework"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#222222] via-[#2a2a2a] to-[#1a1a1a] dark:from-[#0f1117] dark:via-[#1a1d27] dark:to-[#0f1117] py-20">
+  <div className="max-w-7xl mx-auto px-6 lg:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6">
+          Welcome to MINI Documentation
+        </h1>
+        <p className="text-lg sm:text-xl text-gray-300 dark:text-gray-400 mb-8 max-w-2xl">
+          An extremely simple barebone PHP micro-framework for quick prototypes and small projects. No complexity, just clean code.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/quickstart" 
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-[#ababab] hover:bg-[#9a9a9a] rounded-lg transition-colors no-underline"
+          >
+            Get Started
+          </a>
+          <a 
+            href="/api/application" 
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-white/10 hover:bg-white/20 border border-white/30 rounded-lg transition-colors no-underline"
+          >
+            API Reference
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative">
+          <img 
+            src="/logo.png" 
+            alt="MINI Framework Logo" 
+            className="w-full h-auto max-w-md mx-auto rounded-2xl"
+            noZoom
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get up and running with MINI in just a few minutes
+  </p>
+  
+  <Steps>
+    <Step title="Install MINI">
+      Clone the repository or download the latest release from GitHub.
+      
+      ```bash
+      git clone https://github.com/panique/mini.git
+      cd mini
+      ```
+    </Step>
+    
+    <Step title="Configure Database">
+      Edit the database credentials in `application/config/config.php`:
+      
+      ```php config.php
+      define('DB_TYPE', 'mysql');
+      define('DB_HOST', '127.0.0.1');
+      define('DB_NAME', 'mini');
+      define('DB_USER', 'root');
+      define('DB_PASS', 'your_password');
+      ```
+    </Step>
+    
+    <Step title="Set Up Database">
+      Import the SQL files from the `_install/` directory:
+      
+      ```bash
+      mysql -u root -p mini < _install/01-create-database.sql
+      mysql -u root -p mini < _install/02-create-table-song.sql
+      mysql -u root -p mini < _install/03-insert-demo-data-into-table-song.sql
+      ```
+    </Step>
+    
+    <Step title="Start Building">
+      You're ready! Navigate to your application in a browser and start building.
+      
+      <Note>
+        Make sure mod_rewrite is enabled on your server. Check our [Server Setup](/deployment/server-setup) guide for details.
+      </Note>
+    </Step>
+  </Steps>
+</div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Core Features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Everything you need to build small to medium-sized PHP applications
+  </p>
+  
+  <CardGroup cols={2}>
+    <Card 
+      title="Simple MVC Architecture" 
+      icon="sitemap" 
+      href="/concepts/architecture"
+    >
+      Clean separation of concerns with controllers, models, and views
+    </Card>
+    <Card 
+      title="Clean URL Routing" 
+      icon="route" 
+      href="/concepts/routing"
+    >
+      Beautiful URLs that map directly to controllers and methods
+    </Card>
+    <Card 
+      title="PDO Database Layer" 
+      icon="database" 
+      href="/guides/database"
+    >
+      Secure database access using PDO with prepared statements
+    </Card>
+    <Card 
+      title="CRUD Operations" 
+      icon="list-check" 
+      href="/guides/crud-operations"
+    >
+      Complete Create, Read, Update, Delete examples included
+    </Card>
+    <Card 
+      title="AJAX Support" 
+      icon="bolt" 
+      href="/guides/ajax"
+    >
+      Built-in examples for handling AJAX requests
+    </Card>
+    <Card 
+      title="Minimal Setup" 
+      icon="rocket" 
+      href="/installation"
+    >
+      No complex configuration, works out of the box
+    </Card>
+  </CardGroup>
+</div>
 
-## Make it yours
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-4">
+    Explore Documentation
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Deep dive into the framework's concepts and capabilities
+  </p>
+  
+  <CardGroup cols={3}>
+    <Card 
+      title="Core Concepts" 
+      icon="book-open" 
+      href="/concepts/architecture"
+    >
+      Learn how MINI works under the hood
+    </Card>
+    <Card 
+      title="Guides" 
+      icon="compass" 
+      href="/guides/database"
+    >
+      Step-by-step guides for common tasks
+    </Card>
+    <Card 
+      title="Deployment" 
+      icon="server" 
+      href="/deployment/requirements"
+    >
+      Deploy your application to production
+    </Card>
+  </CardGroup>
+</div>
 
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gradient-to-r from-[#222222] to-[#2a2a2a] dark:from-[#1a1d27] dark:to-[#242838] rounded-2xl p-8 sm:p-12 border border-gray-200 dark:border-[#27272a]">
+    <h2 className="text-2xl sm:text-3xl font-semibold text-white mb-4">
+      Ready to Start Building?
+    </h2>
+    <p className="text-base text-gray-300 dark:text-gray-400 mb-6 max-w-2xl">
+      MINI is perfect for quick prototypes, small projects, and learning PHP MVC patterns without the overhead of larger frameworks.
+    </p>
+    <a 
+      href="/quickstart" 
+      className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-[#ababab] hover:bg-[#9a9a9a] rounded-lg transition-colors no-underline"
+    >
+      Get Started Now
+    </a>
+  </div>
+</div>
