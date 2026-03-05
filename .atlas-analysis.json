@@ -1,0 +1,92 @@
+{
+  "projectType": "framework",
+  "projectName": "MINI",
+  "projectDescription": "An extremely simple barebone PHP micro-framework for quick prototypes and small projects",
+  "theme": "almond",
+  "primaryColor": "#ababab",
+  "lightColor": "#222222",
+  "darkColor": "#e9e9e9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/routing",
+              "concepts/controllers",
+              "concepts/models",
+              "concepts/views"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/database",
+              "guides/crud-operations",
+              "guides/ajax",
+              "guides/configuration"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/requirements",
+              "deployment/server-setup",
+              "deployment/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/application",
+              "api/controller",
+              "api/model"
+            ]
+          },
+          {
+            "group": "Helpers",
+            "pages": [
+              "api/helper"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Simple MVC architecture",
+    "Clean URL routing",
+    "PDO database layer",
+    "CRUD operations demo",
+    "AJAX support",
+    "Minimal setup required"
+  ],
+  "publicApiSurface": [
+    "Application::__construct()",
+    "Controller::__construct()",
+    "Controller::loadModel()",
+    "Model::getAllSongs()",
+    "Model::getSong($song_id)",
+    "Model::addSong($artist, $track, $link)",
+    "Model::updateSong($artist, $track, $link, $song_id)",
+    "Model::deleteSong($song_id)",
+    "Model::getAmountOfSongs()",
+    "Helper::debugPDO($sql, $parameters)"
+  ]
+}
